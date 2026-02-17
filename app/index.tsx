@@ -10,6 +10,17 @@ import {
 } from "react-native";
 import { styles } from "./index.styles";
 
+// Try to import liquid-glass, but provide fallback if not available
+let LiquidGlassView: any = View;
+let isLiquidGlassSupported = false;
+try {
+  const liquidGlass = require("@callstack/liquid-glass");
+  LiquidGlassView = liquidGlass.LiquidGlassView;
+  isLiquidGlassSupported = liquidGlass.isLiquidGlassSupported;
+} catch (e) {
+  console.log("Liquid Glass not available, using fallback");
+}
+
 export default function Index() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -119,7 +130,16 @@ export default function Index() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.container}>
-        <View style={styles.purplePanel}>
+        <LiquidGlassView
+          style={[
+            styles.purplePanel,
+            !isLiquidGlassSupported && {
+              backgroundColor: "rgba(230, 173, 239, 0.9)",
+            },
+          ]}
+          interactive
+          effect="clear"
+        >
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setIsDropdownOpen(true)}>
               <View style={styles.monthContainer}>
@@ -177,7 +197,7 @@ export default function Index() {
               );
             })}
           </ScrollView>
-        </View>
+        </LiquidGlassView>
       </View>
 
       {/* Month Dropdown Modal */}
