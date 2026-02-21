@@ -98,15 +98,79 @@ export const styles = StyleSheet.create({
     padding: 16,
     width: "80%",
     maxHeight: "70%",
+    flexDirection: "row", // Two columns side-by-side
+    gap: 16,
+  },
+  // Single column picker for sequential month/year selection
+  dropdownMenuSingle: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    width: "80%",
+    maxHeight: "70%",
+  },
+  // Title for the picker ("Select Month" or "Select Year")
+  pickerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#B902D6",
+    textAlign: "center",
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: "#E6ADEF",
+    marginBottom: 12,
+  },
+  // Container for back button and title (no border, let pickerTitle handle it)
+  pickerTitleContainer: {
+    marginBottom: 0,
+  },
+  // Back button to return to previous step
+  backButton: {
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  // Back button text style
+  backButtonText: {
+    fontSize: 16,
+    color: "#B902D6",
+    fontWeight: "600",
+  },
+  // Individual column for month or year picker
+  pickerColumn: {
+    flex: 1, // Each column takes equal width
+  },
+  // Header text for "Month" and "Year"
+  pickerHeader: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#B902D6",
+    textAlign: "center",
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "#E6ADEF",
+    marginBottom: 8,
+  },
+  // Scrollable area for each column
+  pickerScroll: {
+    maxHeight: "100%",
   },
   dropdownItem: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#E6ADEF",
   },
+  // Highlight style for selected month/year
+  selectedItem: {
+    backgroundColor: "#E6ADEF",
+  },
   dropdownItemText: {
     fontSize: 18,
     color: "#850099",
     textAlign: "center",
+  },
+  // Text style for selected month/year
+  selectedItemText: {
+    fontWeight: "bold",
+    color: "#B902D6",
   },
 });
