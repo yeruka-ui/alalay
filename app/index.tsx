@@ -10,18 +10,8 @@ import {
 } from "react-native";
 import { styles } from "./index.styles";
 
-// Try to import liquid-glass, but provide fallback if not available
-let LiquidGlassView: any = View;
-let isLiquidGlassSupported = false;
-try {
-  const liquidGlass = require("@callstack/liquid-glass");
-  LiquidGlassView = liquidGlass.LiquidGlassView;
-  isLiquidGlassSupported = liquidGlass.isLiquidGlassSupported;
-} catch (e) {
-  console.log("Liquid Glass not available, using fallback");
-}
-
 export default function Index() {
+  // **************************** CALENDAR LOGIC ****************************
   const scrollViewRef = useRef<ScrollView>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -29,6 +19,16 @@ export default function Index() {
   const [pickerStep, setPickerStep] = useState<"month" | "year">("month");
   // Store temporary month selection before year is picked
   const [tempMonth, setTempMonth] = useState<number>(new Date().getMonth());
+
+  // **************************** TAB FILTER LOGIC ****************************
+  // Variable to track active and inactive tabs
+  const [activeTab, setActiveTab] = useState("pending");
+  const tabs = [
+    { id: "pending", label: "Pending", icon: "bell" },
+    { id: "medication", label: "Medication", icon: "plus-square" },
+    { id: "appointments", label: "Appointments", icon: "alert-circle" },
+    { id: "completed", label: "Completed", icon: "check" },
+  ];
 
   const getMonthName = (monthIndex: number): string => {
     const months = [
@@ -134,16 +134,7 @@ export default function Index() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.container}>
-        <LiquidGlassView
-          style={[
-            styles.purplePanel,
-            !isLiquidGlassSupported && {
-              backgroundColor: "rgba(230, 173, 239, 0.9)",
-            },
-          ]}
-          interactive
-          effect="clear"
-        >
+        <View style={styles.purplePanel}>
           <View style={styles.header}>
             <TouchableOpacity
               onPress={() => {
@@ -207,7 +198,7 @@ export default function Index() {
               );
             })}
           </ScrollView>
-        </LiquidGlassView>
+        </View>
       </View>
 
       {/* Month & Year Picker Modal */}
@@ -273,34 +264,36 @@ export default function Index() {
                 </View>
                 <ScrollView style={styles.pickerScroll}>
                   {/* Generate years from 2020 to 2030 */}
-                  {Array.from({ length: 11 }, (_, i) => 2020 + i).map((year) => (
-                    <TouchableOpacity
-                      key={year}
-                      style={[
-                        styles.dropdownItem,
-                        // Highlight currently selected year
-                        selectedDate.getFullYear() === year &&
-                          styles.selectedItem,
-                      ]}
-                      onPress={() => {
-                        // Apply both month and year, then close
-                        const newDate = new Date(year, tempMonth, 1);
-                        setSelectedDate(newDate);
-                        setIsDropdownOpen(false);
-                        setPickerStep("month"); // Reset for next time
-                      }}
-                    >
-                      <Text
+                  {Array.from({ length: 11 }, (_, i) => 2020 + i).map(
+                    (year) => (
+                      <TouchableOpacity
+                        key={year}
                         style={[
-                          styles.dropdownItemText,
+                          styles.dropdownItem,
+                          // Highlight currently selected year
                           selectedDate.getFullYear() === year &&
-                            styles.selectedItemText,
+                            styles.selectedItem,
                         ]}
+                        onPress={() => {
+                          // Apply both month and year, then close
+                          const newDate = new Date(year, tempMonth, 1);
+                          setSelectedDate(newDate);
+                          setIsDropdownOpen(false);
+                          setPickerStep("month"); // Reset for next time
+                        }}
                       >
-                        {year}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            selectedDate.getFullYear() === year &&
+                              styles.selectedItemText,
+                          ]}
+                        >
+                          {year}
+                        </Text>
+                      </TouchableOpacity>
+                    ),
+                  )}
                 </ScrollView>
               </>
             )}

@@ -98,7 +98,7 @@ export const styles = StyleSheet.create({
     padding: 16,
     width: "80%",
     maxHeight: "70%",
-    flexDirection: "row", // Two columns side-by-side
+    flexDirection: "row",
     gap: 16,
   },
   // Single column picker for sequential month/year selection
