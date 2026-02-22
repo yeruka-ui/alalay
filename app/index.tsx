@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import TabFilterBar from "../components/tabFilterBar";
 import { styles } from "./index.styles";
 
 export default function Index() {
@@ -200,6 +201,11 @@ export default function Index() {
           </ScrollView>
         </View>
       </View>
+      <TabFilterBar
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       {/* Month & Year Picker Modal */}
       <Modal
