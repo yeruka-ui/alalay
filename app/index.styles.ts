@@ -92,15 +92,6 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  dropdownMenu: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    width: "80%",
-    maxHeight: "70%",
-    flexDirection: "row",
-    gap: 16,
-  },
   // Single column picker for sequential month/year selection
   dropdownMenuSingle: {
     backgroundColor: "#FFFFFF",
@@ -135,22 +126,7 @@ export const styles = StyleSheet.create({
     color: "#B902D6",
     fontWeight: "600",
   },
-  // Individual column for month or year picker
-  pickerColumn: {
-    flex: 1, // Each column takes equal width
-  },
-  // Header text for "Month" and "Year"
-  pickerHeader: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#B902D6",
-    textAlign: "center",
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: "#E6ADEF",
-    marginBottom: 8,
-  },
-  // Scrollable area for each column
+  // Scrollable area for the picker
   pickerScroll: {
     maxHeight: "100%",
   },
@@ -171,6 +147,29 @@ export const styles = StyleSheet.create({
   // Text style for selected month/year
   selectedItemText: {
     fontWeight: "bold",
+    color: "#B902D6",
+  },
+  // iOS-only: white panel that slides up from the bottom to hold the spinner
+  iosPickerContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 10,
+    alignItems: "center",
+  },
+  // "Done" button inside the iOS picker panel
+  doneButton: {
+    alignSelf: "flex-end",
+    padding: 16,
+    paddingBottom: 0,
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "#B902D6",
   },
 });

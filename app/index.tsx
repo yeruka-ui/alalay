@@ -1,8 +1,10 @@
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -16,10 +18,6 @@ export default function Index() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  // Track which picker step: 'month' or 'year'
-  const [pickerStep, setPickerStep] = useState<"month" | "year">("month");
-  // Store temporary month selection before year is picked
-  const [tempMonth, setTempMonth] = useState<number>(new Date().getMonth());
 
   // **************************** TAB FILTER LOGIC ****************************
   // Variable to track active and inactive tabs
@@ -137,13 +135,7 @@ export default function Index() {
       <View style={styles.container}>
         <View style={styles.purplePanel}>
           <View style={styles.header}>
-            <TouchableOpacity
-              onPress={() => {
-                setIsDropdownOpen(true);
-                setPickerStep("month"); // Reset to month picker when opening
-                setTempMonth(new Date().getMonth()); // Default to current month
-              }}
-            >
+            <TouchableOpacity onPress={() => setIsDropdownOpen(true)}>
               <View style={styles.monthContainer}>
                 <Text style={styles.monthText}>
                   {getMonthName(selectedDate.getMonth())}{" "}
@@ -207,105 +199,45 @@ export default function Index() {
         onTabChange={setActiveTab}
       />
 
-      {/* Month & Year Picker Modal */}
-      <Modal
-        visible={isDropdownOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsDropdownOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDropdownOpen(false)}
+      {/* iOS: native spinner inside a slide-up modal with a Done button */}
+      {Platform.OS === "ios" && (
+        <Modal
+          visible={isDropdownOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsDropdownOpen(false)}
         >
-          <View style={styles.dropdownMenuSingle}>
-            {/* Step 1: Month Picker */}
-            {pickerStep === "month" && (
-              <>
-                <Text style={styles.pickerTitle}>Select Month</Text>
-                <ScrollView style={styles.pickerScroll}>
-                  {Array.from({ length: 12 }, (_, i) => i).map((monthIndex) => (
-                    <TouchableOpacity
-                      key={monthIndex}
-                      style={[
-                        styles.dropdownItem,
-                        // Highlight currently selected month
-                        tempMonth === monthIndex && styles.selectedItem,
-                      ]}
-                      onPress={() => {
-                        // Store selected month and move to year picker
-                        setTempMonth(monthIndex);
-                        setPickerStep("year");
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.dropdownItemText,
-                          tempMonth === monthIndex && styles.selectedItemText,
-                        ]}
-                      >
-                        {getMonthName(monthIndex)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-
-            {/* Step 2: Year Picker */}
-            {pickerStep === "year" && (
-              <>
-                <View style={styles.pickerTitleContainer}>
-                  {/* Back button to return to month picker */}
-                  <TouchableOpacity
-                    onPress={() => setPickerStep("month")}
-                    style={styles.backButton}
-                  >
-                    <Text style={styles.backButtonText}>← Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.pickerTitle}>
-                    Select Year for {getMonthName(tempMonth)}
-                  </Text>
-                </View>
-                <ScrollView style={styles.pickerScroll}>
-                  {/* Generate years from 2020 to 2030 */}
-                  {Array.from({ length: 11 }, (_, i) => 2020 + i).map(
-                    (year) => (
-                      <TouchableOpacity
-                        key={year}
-                        style={[
-                          styles.dropdownItem,
-                          // Highlight currently selected year
-                          selectedDate.getFullYear() === year &&
-                            styles.selectedItem,
-                        ]}
-                        onPress={() => {
-                          // Apply both month and year, then close
-                          const newDate = new Date(year, tempMonth, 1);
-                          setSelectedDate(newDate);
-                          setIsDropdownOpen(false);
-                          setPickerStep("month"); // Reset for next time
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            selectedDate.getFullYear() === year &&
-                              styles.selectedItemText,
-                          ]}
-                        >
-                          {year}
-                        </Text>
-                      </TouchableOpacity>
-                    ),
-                  )}
-                </ScrollView>
-              </>
-            )}
+          <View style={styles.iosPickerContainer}>
+            <TouchableOpacity
+              onPress={() => setIsDropdownOpen(false)}
+              style={styles.doneButton}
+            >
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display="spinner"
+              onChange={(_: DateTimePickerEvent, date?: Date) => {
+                if (date) setSelectedDate(date);
+              }}
+            />
           </View>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
+
+      {/* Android: native calendar dialog — auto-dismisses on selection or cancel */}
+      {Platform.OS === "android" && isDropdownOpen && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={(event: DateTimePickerEvent, date?: Date) => {
+            setIsDropdownOpen(false);
+            if (event.type !== "dismissed" && date) setSelectedDate(date);
+          }}
+        />
+      )}
     </>
   );
 }

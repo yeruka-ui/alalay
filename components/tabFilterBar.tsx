@@ -28,7 +28,7 @@ export default function TabFilterBar({ tabs, activeTab, onTabChange }: Props) {
             onPress={() => onTabChange(tab.id)}
             style={isActive ? styles.activeTab : styles.inactiveTab}
           >
-            <Feather name={tab.icon as any} size={24} />
+            <Feather name={tab.icon as any} size={20} />
             <Text>{tab.label}</Text>
           </TouchableOpacity>
         );
