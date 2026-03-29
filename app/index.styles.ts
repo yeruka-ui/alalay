@@ -1,6 +1,12 @@
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: "#ffffff",
+    flex: 1,
+  },
+
+  //dashboard styles
   container: {
     backgroundColor: "#850099",
     borderRadius: 24,
@@ -24,7 +30,8 @@ export const styles = StyleSheet.create({
   },
   monthText: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontFamily: "System",
+    fontWeight: "500",
     color: "#B902D6",
   },
   addTaskText: {
@@ -86,69 +93,6 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     color: "#B902D6",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  // Single column picker for sequential month/year selection
-  dropdownMenuSingle: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-    width: "80%",
-    maxHeight: "70%",
-  },
-  // Title for the picker ("Select Month" or "Select Year")
-  pickerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#B902D6",
-    textAlign: "center",
-    paddingBottom: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: "#E6ADEF",
-    marginBottom: 12,
-  },
-  // Container for back button and title (no border, let pickerTitle handle it)
-  pickerTitleContainer: {
-    marginBottom: 0,
-  },
-  // Back button to return to previous step
-  backButton: {
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  // Back button text style
-  backButtonText: {
-    fontSize: 16,
-    color: "#B902D6",
-    fontWeight: "600",
-  },
-  // Scrollable area for the picker
-  pickerScroll: {
-    maxHeight: "100%",
-  },
-  dropdownItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E6ADEF",
-  },
-  // Highlight style for selected month/year
-  selectedItem: {
-    backgroundColor: "#E6ADEF",
-  },
-  dropdownItemText: {
-    fontSize: 18,
-    color: "#850099",
-    textAlign: "center",
-  },
-  // Text style for selected month/year
-  selectedItemText: {
-    fontWeight: "bold",
-    color: "#B902D6",
-  },
   // iOS-only: white panel that slides up from the bottom to hold the spinner
   iosPickerContainer: {
     position: "absolute",
@@ -170,6 +114,45 @@ export const styles = StyleSheet.create({
   doneButtonText: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#B902D6",
+  },
+
+  // record locker styles
+  topPanel: {
+    backgroundColor: "#BE01DC",
+    borderRadius: 30,
+    padding: 35,
+  },
+  secondPanel: {
+    flexDirection: "row",
+    alignItems: "center",
+    margin: 10,
+  },
+  record_title: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#B902D6",
+  },
+  backButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 360,
+    backgroundColor: "#F0EEFE",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  backArrow: {
+    fontSize: 30,
     color: "#B902D6",
   },
 });
