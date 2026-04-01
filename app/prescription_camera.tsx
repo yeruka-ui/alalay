@@ -8,16 +8,20 @@ import {
   Animated,
   Easing,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import MedicationCard, {
   type MedicationItem,
 } from "../components/MedicationCard";
-import { styles as sharedStyles } from "./index.styles";
+import { styles as sharedStyles } from "../styles/index.styles.ts";
+import { savePrescription, uploadFile } from "../utils/database";
+import { validateMedicationName } from "../utils/medicationValidator";
 
 type ScreenPhase = "capture" | "loading" | "results";
 
@@ -27,6 +31,8 @@ export default function PrescriptionCamera() {
   const [screenPhase, setScreenPhase] = useState<ScreenPhase>("capture");
   const [medications, setMedications] = useState<MedicationItem[]>([]);
   const [statusMessage, setStatusMessage] = useState("Uploading image...");
+  const [manualModalVisible, setManualModalVisible] = useState(false);
+  const [manualDraft, setManualDraft] = useState({ name: "", dosage: "", instructions: "", time: "" });
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -92,6 +98,7 @@ export default function PrescriptionCamera() {
       instructions: item.instructions || "",
       time: item.time || "",
       dosage: item.dosage,
+      confidence: item.confidence || "medium",
     }));
   };
 
@@ -127,11 +134,11 @@ export default function PrescriptionCamera() {
                   {
                     text: `Analyze this prescription image. Extract each medication into a JSON array.
 IMPORTANT: Create a SEPARATE entry for EACH time slot. If a medication is taken 3 times a day, output 3 separate objects with the same name but different times.
-Each object must have: "name" (string), "instructions" (string, e.g. "after eating"), "time" (string, e.g. "9:00 AM"), "dosage" (string, e.g. "500mg").
+Each object must have: "name" (string), "instructions" (string, e.g. "after eating"), "time" (string, e.g. "9:00 AM"), "dosage" (string, e.g. "500mg"), "confidence" (string: "low", "medium", or "high" — based on how clearly the medication text is visible in the image).
 If time is not visible, infer reasonable defaults based on frequency (e.g. once daily: "8:00 AM", twice daily: "8:00 AM" and "8:00 PM", three times daily: "8:00 AM", "1:00 PM", "8:00 PM").
 Return ONLY the JSON array, no other text.
 Example for "Paracetamol 500mg 3 times a day after eating":
-[{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","dosage":"500mg"},{"name":"Paracetamol","instructions":"after eating","time":"1:00 PM","dosage":"500mg"},{"name":"Paracetamol","instructions":"after eating","time":"8:00 PM","dosage":"500mg"}]`,
+[{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","dosage":"500mg","confidence":"high"},{"name":"Paracetamol","instructions":"after eating","time":"1:00 PM","dosage":"500mg","confidence":"high"},{"name":"Paracetamol","instructions":"after eating","time":"8:00 PM","dosage":"500mg","confidence":"high"}]`,
                   },
                 ],
               },
@@ -151,7 +158,11 @@ Example for "Paracetamol 500mg 3 times a day after eating":
         "No text extracted.";
 
       const items = parseMedications(text);
-      setMedications(items);
+      const validated = items.map((item) => ({
+        ...item,
+        suggestion: validateMedicationName(item.name),
+      }));
+      setMedications(validated);
       setScreenPhase("results");
     } catch (error: any) {
       console.error("VLM Error:", error);
@@ -227,12 +238,72 @@ Example for "Paracetamol 500mg 3 times a day after eating":
     );
   };
 
-  const handleAddToAlalay = () => {
-    Alert.alert(
-      "Added!",
-      "Your medications have been added to Alalay.",
-      [{ text: "OK", onPress: () => router.back() }]
+  const handleAcceptSuggestion = (id: string, suggestedName: string) => {
+    setMedications((prev) => {
+      const target = prev.find((m) => m.id === id);
+      if (!target) return prev;
+      const originalName = target.name;
+      return prev.map((m) => {
+        if (m.name === originalName) {
+          return { ...m, name: suggestedName, suggestion: null };
+        }
+        return m;
+      });
+    });
+  };
+
+  const handleDismissSuggestion = (id: string) => {
+    setMedications((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, suggestion: null } : m))
     );
+  };
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleAddToAlalay = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      // Upload prescription image if available
+      let uploadedImageUrl: string | undefined;
+      if (imageUri) {
+        try {
+          uploadedImageUrl = await uploadFile("prescriptions", imageUri, "prescription.jpg");
+        } catch {
+          // Continue without image upload — medications still get saved
+        }
+      }
+
+      await savePrescription(medications, uploadedImageUrl, undefined, "camera");
+
+      Alert.alert("Added!", "Your medications have been saved to Alalay.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Save Error", error.message || "Failed to save medications.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleManualAdd = () => {
+    const { name, time } = manualDraft;
+    if (!name.trim()) {
+      Alert.alert("Required", "Please enter a medication name.");
+      return;
+    }
+    const newItem: MedicationItem = {
+      id: `${Date.now()}-manual`,
+      name: name.trim(),
+      dosage: manualDraft.dosage.trim() || undefined,
+      instructions: manualDraft.instructions.trim(),
+      time: time.trim() || "8:00 AM",
+      confidence: "high",
+      suggestion: validateMedicationName(name.trim()),
+    };
+    setMedications((prev) => [...prev, newItem]);
+    setManualDraft({ name: "", dosage: "", instructions: "", time: "" });
+    setManualModalVisible(false);
   };
 
   const handleRetake = () => {
@@ -258,6 +329,13 @@ Example for "Paracetamol 500mg 3 times a day after eating":
         {screenPhase === "results" ? (
           /* ── Results phase: medication card list ── */
           <>
+            {medications.filter((m) => m.confidence === "low").length > 0 && (
+              <View style={styles.reviewNotice}>
+                <Text style={styles.reviewNoticeText}>
+                  ⚠ {medications.filter((m) => m.confidence === "low").length} medication(s) need review
+                </Text>
+              </View>
+            )}
             <ScrollView
               style={styles.resultsContainer}
               contentContainerStyle={styles.resultsContent}
@@ -266,18 +344,23 @@ Example for "Paracetamol 500mg 3 times a day after eating":
                 <MedicationCard
                   key={med.id}
                   item={med}
-                  onEdit={() => {}}
+                  onEdit={() => { }}
                   onSave={handleUpdateMedication}
+                  onAcceptSuggestion={handleAcceptSuggestion}
+                  onDismissSuggestion={handleDismissSuggestion}
                 />
               ))}
             </ScrollView>
 
             <View style={styles.bottomBar}>
               <TouchableOpacity
-                style={styles.addButton}
+                style={[styles.addButton, isSaving && styles.disabledButton]}
                 onPress={handleAddToAlalay}
+                disabled={isSaving}
               >
-                <Text style={styles.bottomButtonText}>Add to Alalay</Text>
+                <Text style={styles.bottomButtonText}>
+                  {isSaving ? "Saving..." : "Add to Alalay"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -286,7 +369,74 @@ Example for "Paracetamol 500mg 3 times a day after eating":
               >
                 <Text style={styles.bottomButtonText}>Retake photo</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.manualButton}
+                onPress={() => setManualModalVisible(true)}
+              >
+                <Text style={styles.bottomButtonText}>+ Add manually</Text>
+              </TouchableOpacity>
             </View>
+
+            <Modal
+              visible={manualModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setManualModalVisible(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalPopup}>
+                  <Text style={styles.modalTitle}>Add Medication</Text>
+
+                  <Text style={styles.modalLabel}>Name</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={manualDraft.name}
+                    onChangeText={(t) => setManualDraft({ ...manualDraft, name: t })}
+                    placeholder="Medication name"
+                  />
+
+                  <Text style={styles.modalLabel}>Dosage</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={manualDraft.dosage}
+                    onChangeText={(t) => setManualDraft({ ...manualDraft, dosage: t })}
+                    placeholder="e.g. 500mg"
+                  />
+
+                  <Text style={styles.modalLabel}>Instructions</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={manualDraft.instructions}
+                    onChangeText={(t) => setManualDraft({ ...manualDraft, instructions: t })}
+                    placeholder="e.g. after eating"
+                  />
+
+                  <Text style={styles.modalLabel}>Time</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={manualDraft.time}
+                    onChangeText={(t) => setManualDraft({ ...manualDraft, time: t })}
+                    placeholder="e.g. 8:00 AM"
+                  />
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={styles.modalCancelBtn}
+                      onPress={() => {
+                        setManualDraft({ name: "", dosage: "", instructions: "", time: "" });
+                        setManualModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.modalSaveBtn} onPress={handleManualAdd}>
+                      <Text style={styles.modalSaveText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
           </>
         ) : (
           /* ── Capture / Loading phase ── */
@@ -474,5 +624,91 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  reviewNotice: {
+    backgroundColor: "#FFF0F0",
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center" as const,
+  },
+  reviewNoticeText: {
+    color: "#CC4444",
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  manualButton: {
+    flex: 1,
+    backgroundColor: "#555",
+    borderRadius: 50,
+    paddingVertical: 16,
+    alignItems: "center" as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    padding: 24,
+  },
+  modalPopup: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%" as const,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: "#850099",
+    marginBottom: 20,
+    textAlign: "center" as const,
+  },
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: "#939292",
+    marginBottom: 4,
+    marginTop: 10,
+  },
+  modalInput: {
+    fontSize: 15,
+    color: "#333",
+    borderWidth: 1,
+    borderColor: "#E6ADEF",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#fcf9fc",
+  },
+  modalButtons: {
+    flexDirection: "row" as const,
+    gap: 12,
+    marginTop: 24,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: "#FEE8FE",
+    borderRadius: 50,
+    paddingVertical: 14,
+    alignItems: "center" as const,
+  },
+  modalCancelText: {
+    color: "#850099",
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: "#B902D6",
+    borderRadius: 50,
+    paddingVertical: 14,
+    alignItems: "center" as const,
+  },
+  modalSaveText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "600" as const,
   },
 });

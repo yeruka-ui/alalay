@@ -42,3 +42,13 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Agent, tracking, and temp files
+.agents/
+.gemini/
+CLAUDE.md
+TASK.md
+skills-lock.json
+git_status.*
+tracked_files.*
+git_log.txt

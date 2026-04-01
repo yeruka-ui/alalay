@@ -26,8 +26,8 @@ export default function FloatingActionMenu({ actions }: Props) {
 
   const defaultActions: ActionItem[] = [
     { id: "camera", icon: "camera", onPress: () => router.push("/prescription_camera") },
-    { id: "document", icon: "file-text", onPress: () => {} },
-    { id: "mic", icon: "mic", onPress: () => {} },
+    { id: "document", icon: "file-text", onPress: () => router.push("/record_locker") },
+    { id: "mic", icon: "mic", onPress: () => { } },
   ];
 
   const activeActions = actions || defaultActions;

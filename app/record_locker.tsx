@@ -1,15 +1,19 @@
 import TabFilterBar from "@/components/tabFilterBar";
+import type { MedicalRecord } from "@/types/database";
+import { getMedicalRecords, saveMedicalRecord, uploadFile } from "@/utils/database";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { styles } from "../styles/index.styles";
 
@@ -21,8 +25,44 @@ export default function RecordLocker() {
     { id: "prescriptions", label: "Rx", icon: "file-text" },
     { id: "lab_results", label: "Results", icon: "file-text" },
   ];
-  const [isFabOpen, setIsFabOpen] = useState(false); // State to track FAB open/close
-  const fabAnimation = useRef(new Animated.Value(0)).current; // Animation value for FAB
+  const [records, setRecords] = useState<MedicalRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFabOpen, setIsFabOpen] = useState(false);
+  const fabAnimation = useRef(new Animated.Value(0)).current;
+
+  const tabToRecordType: Record<string, string | undefined> = {
+    all: undefined,
+    ids: "medical_id",
+    prescriptions: "prescription",
+    lab_results: "lab_result",
+  };
+
+  const fetchRecords = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await getMedicalRecords(tabToRecordType[activeTab]);
+      setRecords(data);
+    } catch {
+      // User may not be logged in
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchRecords();
+  }, [fetchRecords]);
+
+  const saveFileAsRecord = async (uri: string, fileName: string, recordType: "prescription" | "lab_result" | "medical_id" | "other" = "other") => {
+    try {
+      const fileUrl = await uploadFile("medical-records", uri, fileName);
+      await saveMedicalRecord(recordType, fileUrl, fileName);
+      Alert.alert("Saved!", "Record has been added.");
+      fetchRecords();
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to save record.");
+    }
+  };
 
   const openCamera = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -34,7 +74,8 @@ export default function RecordLocker() {
       });
 
       if (!result.canceled) {
-        console.log(result.assets[0].uri); // this is the photo's file path
+        const uri = result.assets[0].uri;
+        saveFileAsRecord(uri, "photo.jpg");
       }
     }
   };
@@ -47,7 +88,8 @@ export default function RecordLocker() {
         quality: 1,
       });
       if (!result.canceled) {
-        console.log(result.assets[0].uri);
+        const uri = result.assets[0].uri;
+        saveFileAsRecord(uri, "image.jpg");
       }
     }
   };
@@ -58,9 +100,8 @@ export default function RecordLocker() {
       copyToCacheDirectory: true,
     });
     if (!result.canceled) {
-      console.log(result.assets[0].uri);
-      console.log(result.assets[0].name);
-      console.log(result.assets[0].mimeType);
+      const asset = result.assets[0];
+      saveFileAsRecord(asset.uri, asset.name ?? "document");
     }
   };
 
@@ -88,7 +129,7 @@ export default function RecordLocker() {
           justifyContent: "space-between",
         }}
       >
-        <View>
+        <View >
           <View style={styles.topPanel}></View>
 
           <View style={styles.secondPanel}>
@@ -107,6 +148,52 @@ export default function RecordLocker() {
             />
           </View>
         </View>
+        {/* Records List */}
+        {isLoading ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color="#B902D6" />
+          </View>
+        ) : records.length > 0 ? (
+          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
+            {records.map((record) => (
+              <View
+                key={record.id}
+                style={{
+                  backgroundColor: "#FFF",
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 10,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                <Feather
+                  name={record.record_type === "prescription" ? "file-text" : record.record_type === "medical_id" ? "credit-card" : "clipboard"}
+                  size={22}
+                  color="#B902D6"
+                  style={{ marginRight: 12 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#333" }}>
+                    {record.title ?? "Untitled Record"}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                    {record.record_type.replace("_", " ")} · {new Date(record.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ color: "#999", fontSize: 15 }}>No records yet</Text>
+          </View>
+        )}
+
         <View style={styles.tabAndAddContainer}>
           <View style={{ flex: 1 }}>
             {/* This is the container for the TabFilterBar */}

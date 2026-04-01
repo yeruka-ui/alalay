@@ -16,15 +16,19 @@ export type MedicationItem = {
   instructions: string;
   time: string;
   dosage?: string;
+  suggestion?: string | null;
+  confidence?: "low" | "medium" | "high";
 };
 
 type MedicationCardProps = {
   item: MedicationItem;
   onEdit: () => void;
   onSave?: (updated: MedicationItem, applyToAll: boolean, originalName: string) => void;
+  onAcceptSuggestion?: (id: string, suggestedName: string) => void;
+  onDismissSuggestion?: (id: string) => void;
 };
 
-export default function MedicationCard({ item, onEdit, onSave }: MedicationCardProps) {
+export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestion, onDismissSuggestion }: MedicationCardProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [draft, setDraft] = useState(item);
 
@@ -56,12 +60,36 @@ export default function MedicationCard({ item, onEdit, onSave }: MedicationCardP
     setModalVisible(false);
   };
 
+  const confidenceBorderColor =
+    item.confidence === "low" ? "#FF6B6B" :
+      item.confidence === "medium" ? "#FFB84D" : "transparent";
+
   return (
     <>
-      <Background style={styles.card}>
+      <Background style={[styles.card, { borderLeftWidth: 4, borderLeftColor: confidenceBorderColor }]}>
         <View style={styles.content}>
           <Text style={styles.label}>Medication</Text>
           <Text style={styles.name}>{item.name}</Text>
+          {item.suggestion && (
+            <View style={styles.suggestionBanner}>
+              <Text style={styles.suggestionText}>
+                Did you mean "<Text style={styles.suggestionName}>{item.suggestion}</Text>"?
+              </Text>
+              <View style={styles.suggestionActions}>
+                <TouchableOpacity onPress={() => onAcceptSuggestion?.(item.id, item.suggestion!)}>
+                  <Text style={styles.acceptText}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onDismissSuggestion?.(item.id)}>
+                  <Text style={styles.dismissText}>No</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {item.confidence === "low" && (
+            <View style={styles.confidenceBanner}>
+              <Text style={styles.confidenceText}>⚠ This was unreadable — please review</Text>
+            </View>
+          )}
           <Text style={styles.instructions}>{item.instructions}</Text>
         </View>
 
@@ -251,6 +279,52 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: "#FFF",
     fontSize: 14,
+    fontWeight: "600",
+  },
+  suggestionBanner: {
+    backgroundColor: "#FEE8FE",
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 4,
+    marginBottom: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  suggestionText: {
+    fontSize: 12,
+    color: "#555",
+    flex: 1,
+  },
+  suggestionName: {
+    fontWeight: "700",
+    color: "#850099",
+  },
+  suggestionActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginLeft: 8,
+  },
+  acceptText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#B902D6",
+  },
+  dismissText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#999",
+  },
+  confidenceBanner: {
+    backgroundColor: "#FFF0F0",
+    borderRadius: 8,
+    padding: 6,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  confidenceText: {
+    fontSize: 12,
+    color: "#CC4444",
     fontWeight: "600",
   },
 });

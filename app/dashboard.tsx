@@ -2,8 +2,9 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { Stack } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Modal,
   Platform,
@@ -15,6 +16,8 @@ import {
 import FloatingActionMenu from "../components/floatingActionMenu";
 import TabFilterBar from "../components/tabFilterBar";
 import { styles } from "../styles/index.styles";
+import type { Medication, MedicationSchedule } from "../types/database";
+import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "../utils/database";
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
@@ -31,6 +34,41 @@ export default function Dashboard() {
     { id: "appointments", label: "Appointments", icon: "alert-circle" },
     { id: "completed", label: "Completed", icon: "check" },
   ];
+
+  // **************************** DATA FETCHING ****************************
+  const [schedules, setSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
+  const [allMedications, setAllMedications] = useState<Medication[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+
+  const fetchDashboardData = useCallback(async () => {
+    setIsLoadingData(true);
+    try {
+      const [schedulesData, medsData] = await Promise.all([
+        getSchedulesForDate(selectedDate),
+        getActiveMedications(),
+      ]);
+      setSchedules(schedulesData);
+      setAllMedications(medsData);
+    } catch {
+      // Silently fail — user may not be logged in yet
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Filter data based on active tab
+  const filteredSchedules = schedules.filter((s) => {
+    switch (activeTab) {
+      case "pending": return s.status === "pending";
+      case "medication": return true;
+      case "completed": return s.status === "taken";
+      default: return true;
+    }
+  });
 
   const getMonthName = (monthIndex: number): string => {
     const months = [
@@ -204,6 +242,93 @@ export default function Dashboard() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
+
+        {/* Medication Schedule List */}
+        {isLoadingData ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color="#B902D6" />
+          </View>
+        ) : filteredSchedules.length > 0 ? (
+          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
+            {filteredSchedules.map((schedule) => (
+              <View
+                key={schedule.id}
+                style={{
+                  backgroundColor: "#FFF",
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 10,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: "600", color: "#333" }}>
+                    {schedule.medication?.name}
+                  </Text>
+                  {schedule.medication?.dosage && (
+                    <Text style={{ fontSize: 13, color: "#999", marginTop: 2 }}>
+                      {schedule.medication.dosage}
+                    </Text>
+                  )}
+                  <Text style={{ fontSize: 13, color: "#B902D6", marginTop: 2 }}>
+                    {schedule.scheduled_time ?? "No time set"}
+                  </Text>
+                </View>
+                {schedule.status === "pending" && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      await updateScheduleStatus(schedule.id, "taken");
+                      fetchDashboardData();
+                    }}
+                    style={{
+                      backgroundColor: "#B902D6",
+                      borderRadius: 20,
+                      paddingVertical: 8,
+                      paddingHorizontal: 16,
+                    }}
+                  >
+                    <Text style={{ color: "#FFF", fontSize: 13, fontWeight: "600" }}>Take</Text>
+                  </TouchableOpacity>
+                )}
+                {schedule.status === "taken" && (
+                  <Text style={{ color: "#4CAF50", fontWeight: "600" }}>✓ Taken</Text>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        ) : activeTab === "medication" && allMedications.length > 0 ? (
+          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
+            {allMedications.map((med) => (
+              <View
+                key={med.id}
+                style={{
+                  backgroundColor: "#FFF",
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 10,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "#333" }}>{med.name}</Text>
+                {med.dosage && <Text style={{ fontSize: 13, color: "#999", marginTop: 2 }}>{med.dosage}</Text>}
+                {med.instructions && <Text style={{ fontSize: 13, color: "#666", marginTop: 2 }}>{med.instructions}</Text>}
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
+          </View>
+        )}
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />
