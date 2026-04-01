@@ -117,16 +117,16 @@ export const styles = StyleSheet.create({
     color: "#B902D6",
   },
 
-  // record locker styles
+  //************************* record locker styles ****************************//
   topPanel: {
     backgroundColor: "#BE01DC",
     borderRadius: 30,
     padding: 35,
   },
+  //Panel for the Back Button and the Record Locker Title
   secondPanel: {
     flexDirection: "row",
     alignItems: "center",
-    margin: 10,
   },
   record_title: {
     position: "absolute",
@@ -154,5 +154,45 @@ export const styles = StyleSheet.create({
   backArrow: {
     fontSize: 30,
     color: "#B902D6",
+  },
+  // Search Input for the Record Locker
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 24,
+    marginHorizontal: 20,
+    paddingHorizontal: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+    color: "#888",
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+  },
+  tabAndAddContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  addButton: {
+    backgroundColor: "#CA0DE7",
+    shadowColor: "#0000007d",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    marginRight: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
