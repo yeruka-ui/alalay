@@ -1,7 +1,10 @@
 import TabFilterBar from "@/components/tabFilterBar";
 import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
+    Alert,
     Animated,
     Text,
     TextInput,
@@ -20,6 +23,54 @@ export default function RecordLocker() {
   ];
   const [isFabOpen, setIsFabOpen] = useState(false); // State to track FAB open/close
   const fabAnimation = useRef(new Animated.Value(0)).current; // Animation value for FAB
+
+  const openCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (permission.granted) {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        console.log(result.assets[0].uri); // this is the photo's file path
+      }
+    }
+  };
+
+  const openImageLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.granted) {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 1,
+      });
+      if (!result.canceled) {
+        console.log(result.assets[0].uri);
+      }
+    }
+  };
+
+  const openDocumentPicker = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", "image/*"],
+      copyToCacheDirectory: true,
+    });
+    if (!result.canceled) {
+      console.log(result.assets[0].uri);
+      console.log(result.assets[0].name);
+      console.log(result.assets[0].mimeType);
+    }
+  };
+
+  const openFilePicker = () => {
+    Alert.alert("Add Record", "Choose a source", [
+      { text: "Photo Library", onPress: () => openImageLibrary() },
+      { text: "Files", onPress: () => openDocumentPicker() },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   useEffect(() => {
     Animated.spring(fabAnimation, {
@@ -73,21 +124,29 @@ export default function RecordLocker() {
                 right: 0,
                 alignItems: "center",
                 gap: 12,
+                shadowColor: "#0000007d",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
                 transform: [
                   {
                     translateY: fabAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [20, 0],
+                      outputRange: [60, 0],
                     }),
                   },
                 ],
                 opacity: fabAnimation,
               }}
             >
-              <TouchableOpacity style={styles.addButton}>
+              <TouchableOpacity style={styles.addButton} onPress={openCamera}>
                 <Feather name="camera" size={24} color={"#ffffff"} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.addButton}>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={openFilePicker}
+              >
                 <Feather name="file-text" size={24} color={"#ffffff"} />
               </TouchableOpacity>
             </Animated.View>
