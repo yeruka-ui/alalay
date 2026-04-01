@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import FloatingActionMenu from "../components/floatingActionMenu";
 import TabFilterBar from "../components/tabFilterBar";
-import { styles } from "./index.styles";
+import { styles } from "../styles/index.styles";
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
