@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import FloatingActionMenu from "../components/floatingActionMenu";
 import TabFilterBar from "../components/tabFilterBar";
 import { styles } from "./index.styles";
 
@@ -203,6 +204,9 @@ export default function Dashboard() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
+
+        {/* Floating Action Menu */}
+        <FloatingActionMenu />
       </View>
 
       {/* iOS: native spinner inside a slide-up modal with a Done button */}
