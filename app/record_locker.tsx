@@ -1,9 +1,14 @@
 import TabFilterBar from "@/components/tabFilterBar";
 import type { MedicalRecord } from "@/types/database";
-import { getMedicalRecords, saveMedicalRecord, uploadFile } from "@/utils/database";
+import {
+  getMedicalRecords,
+  saveMedicalRecord,
+  uploadFile,
+} from "@/utils/database";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -53,7 +58,15 @@ export default function RecordLocker() {
     fetchRecords();
   }, [fetchRecords]);
 
-  const saveFileAsRecord = async (uri: string, fileName: string, recordType: "prescription" | "lab_result" | "medical_id" | "other" = "other") => {
+  const saveFileAsRecord = async (
+    uri: string,
+    fileName: string,
+    recordType:
+      | "prescription"
+      | "lab_result"
+      | "medical_id"
+      | "other" = "other",
+  ) => {
     try {
       const fileUrl = await uploadFile("medical-records", uri, fileName);
       await saveMedicalRecord(recordType, fileUrl, fileName);
@@ -129,11 +142,14 @@ export default function RecordLocker() {
           justifyContent: "space-between",
         }}
       >
-        <View >
+        <View>
           <View style={styles.topPanel}></View>
 
           <View style={styles.secondPanel}>
-            <TouchableOpacity style={styles.backButton}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
               <Text style={styles.backArrow}>‹</Text>
             </TouchableOpacity>
             <Text style={styles.record_title}>Records</Text>
@@ -150,7 +166,9 @@ export default function RecordLocker() {
         </View>
         {/* Records List */}
         {isLoading ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
             <ActivityIndicator size="large" color="#B902D6" />
           </View>
         ) : records.length > 0 ? (
@@ -172,24 +190,35 @@ export default function RecordLocker() {
                 }}
               >
                 <Feather
-                  name={record.record_type === "prescription" ? "file-text" : record.record_type === "medical_id" ? "credit-card" : "clipboard"}
+                  name={
+                    record.record_type === "prescription"
+                      ? "file-text"
+                      : record.record_type === "medical_id"
+                        ? "credit-card"
+                        : "clipboard"
+                  }
                   size={22}
                   color="#B902D6"
                   style={{ marginRight: 12 }}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#333" }}>
+                  <Text
+                    style={{ fontSize: 15, fontWeight: "600", color: "#333" }}
+                  >
                     {record.title ?? "Untitled Record"}
                   </Text>
                   <Text style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
-                    {record.record_type.replace("_", " ")} · {new Date(record.created_at).toLocaleDateString()}
+                    {record.record_type.replace("_", " ")} ·{" "}
+                    {new Date(record.created_at).toLocaleDateString()}
                   </Text>
                 </View>
               </View>
             ))}
           </ScrollView>
         ) : (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
             <Text style={{ color: "#999", fontSize: 15 }}>No records yet</Text>
           </View>
         )}
