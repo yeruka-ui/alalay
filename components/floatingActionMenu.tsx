@@ -28,14 +28,18 @@ export default function FloatingActionMenu({ actions }: Props) {
     {
       id: "camera",
       icon: "camera",
-      onPress: () => router.push("/prescription_camera"),
+      onPress: () => router.navigate("/prescription_camera"),
     },
     {
       id: "document",
       icon: "file-text",
-      onPress: () => router.push("/record_locker"),
+      onPress: () => router.navigate("/record_locker"),
     },
-    { id: "mic", icon: "mic", onPress: () => router.push("/talk_to_alalay") },
+    {
+      id: "mic",
+      icon: "mic",
+      onPress: () => router.navigate("/talk_to_alalay"),
+    },
   ];
 
   const activeActions = actions || defaultActions;
