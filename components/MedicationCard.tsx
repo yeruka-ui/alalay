@@ -1,4 +1,3 @@
-import { Background } from "@react-navigation/elements";
 import { useState } from "react";
 import {
   Alert,
@@ -66,7 +65,7 @@ export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestio
 
   return (
     <>
-      <Background style={[styles.card, { borderLeftWidth: 4, borderLeftColor: confidenceBorderColor }]}>
+      <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: confidenceBorderColor }]}>
         <View style={styles.content}>
           <Text style={styles.label}>Medication</Text>
           <Text style={styles.name}>{item.name}</Text>
@@ -101,7 +100,7 @@ export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestio
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         </View>
-      </Background>
+      </View>
 
       <Modal
         visible={modalVisible}

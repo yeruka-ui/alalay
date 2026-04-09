@@ -111,15 +111,19 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
               },
             ],
           }),
-        }
+        },
       );
 
       if (!response.ok) {
         if (response.status === 429) {
-          throw new Error("Quota limit reached. Wait a minute and try again, or enable billing on your Google AI account.");
+          throw new Error(
+            "Quota limit reached. Wait a minute and try again, or enable billing on your Google AI account.",
+          );
         }
         if (response.status === 503) {
-          throw new Error("Gemini model is temporarily unavailable. Try again in a moment.");
+          throw new Error(
+            "Gemini model is temporarily unavailable. Try again in a moment.",
+          );
         }
         const err = await response.text();
         throw new Error(`Gemini error: ${response.status} ${err}`);
@@ -140,7 +144,10 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) {
-        Alert.alert("Permission Required", "Microphone access is needed. Please enable it in Settings.");
+        Alert.alert(
+          "Permission Required",
+          "Microphone access is needed. Please enable it in Settings.",
+        );
         return;
       }
 
@@ -168,12 +175,24 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
 
         const t = Date.now() / 1000;
         const target1 = meterToScale(db * 0.75) + Math.sin(t * 2.1) * 0.08;
-        const target2 = meterToScale(db * 1.0)  + Math.sin(t * 3.7) * 0.08;
+        const target2 = meterToScale(db * 1.0) + Math.sin(t * 3.7) * 0.08;
         const target3 = meterToScale(db * 0.85) + Math.sin(t * 1.5) * 0.08;
 
-        scale1.value = withSpring(target1, { damping: 22, stiffness: 280, mass: 0.6 });
-        scale2.value = withSpring(target2, { damping: 14, stiffness: 380, mass: 0.4 });
-        scale3.value = withSpring(target3, { damping: 30, stiffness: 200, mass: 0.8 });
+        scale1.value = withSpring(target1, {
+          damping: 22,
+          stiffness: 280,
+          mass: 0.6,
+        });
+        scale2.value = withSpring(target2, {
+          damping: 14,
+          stiffness: 380,
+          mass: 0.4,
+        });
+        scale3.value = withSpring(target3, {
+          damping: 30,
+          stiffness: 200,
+          mass: 0.8,
+        });
       });
 
       await recording.startAsync();
@@ -181,7 +200,10 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
       setPhase("listening");
     } catch (error: any) {
       console.error("Recording start error:", error);
-      Alert.alert("Microphone Error", error.message || "Could not start recording.");
+      Alert.alert(
+        "Microphone Error",
+        error.message || "Could not start recording.",
+      );
     }
   };
 
@@ -217,16 +239,21 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
   const handleUpdateMedication = (
     updated: MedicationItem,
     applyToAll: boolean,
-    originalName: string
+    originalName: string,
   ) => {
     setMedications((prev) =>
       prev.map((m) => {
         if (m.id === updated.id) return updated;
         if (applyToAll && m.name === originalName) {
-          return { ...m, name: updated.name, dosage: updated.dosage, instructions: updated.instructions };
+          return {
+            ...m,
+            name: updated.name,
+            dosage: updated.dosage,
+            instructions: updated.instructions,
+          };
         }
         return m;
-      })
+      }),
     );
   };
 
@@ -279,10 +306,16 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
               ))}
             </ScrollView>
             <View style={styles.bottomBar}>
-              <TouchableOpacity style={styles.addButton} onPress={handleAddToAlalay}>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={handleAddToAlalay}
+              >
                 <Text style={styles.bottomButtonText}>Add to Alalay</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.retakeButton} onPress={handleTryAgain}>
+              <TouchableOpacity
+                style={styles.retakeButton}
+                onPress={handleTryAgain}
+              >
                 <Text style={styles.bottomButtonText}>Try again</Text>
               </TouchableOpacity>
             </View>
@@ -299,7 +332,10 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
               </>
             ) : (
               <>
-                <TouchableOpacity onPress={handleCirclePress} activeOpacity={0.85}>
+                <TouchableOpacity
+                  onPress={handleCirclePress}
+                  activeOpacity={0.85}
+                >
                   <View style={styles.circle}>
                     {phase === "idle" ? (
                       <View style={styles.barsRow}>
@@ -309,9 +345,15 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
                       </View>
                     ) : (
                       <View style={styles.barsRow}>
-                        <Animated.View style={[styles.listeningBar, bar1Style]} />
-                        <Animated.View style={[styles.listeningBar, bar2Style]} />
-                        <Animated.View style={[styles.listeningBar, bar3Style]} />
+                        <Animated.View
+                          style={[styles.listeningBar, bar1Style]}
+                        />
+                        <Animated.View
+                          style={[styles.listeningBar, bar2Style]}
+                        />
+                        <Animated.View
+                          style={[styles.listeningBar, bar3Style]}
+                        />
                       </View>
                     )}
                   </View>
@@ -323,8 +365,8 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
                   {phase === "idle"
                     ? "Whenever you're ready"
                     : isHearing
-                    ? "Hearing you..."
-                    : "Tap to stop"}
+                      ? "Hearing you..."
+                      : "Tap to stop"}
                 </Text>
               </>
             )}

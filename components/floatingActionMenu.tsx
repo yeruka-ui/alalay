@@ -25,9 +25,17 @@ export default function FloatingActionMenu({ actions }: Props) {
   const isOpenRef = useRef(false);
 
   const defaultActions: ActionItem[] = [
-    { id: "camera", icon: "camera", onPress: () => router.push("/prescription_camera") },
-    { id: "document", icon: "file-text", onPress: () => router.push("/record_locker") },
-    { id: "mic", icon: "mic", onPress: () => { } },
+    {
+      id: "camera",
+      icon: "camera",
+      onPress: () => router.push("/prescription_camera"),
+    },
+    {
+      id: "document",
+      icon: "file-text",
+      onPress: () => router.push("/record_locker"),
+    },
+    { id: "mic", icon: "mic", onPress: () => router.push("/talk_to_alalay") },
   ];
 
   const activeActions = actions || defaultActions;
@@ -76,9 +84,9 @@ export default function FloatingActionMenu({ actions }: Props) {
   // - Document: middle-left (left and above main button)
   // - Camera: bottom-left (left of main button)
   const buttonPositions = [
-    { translateX: -80, translateY: -10 },   // camera — bottom-left
-    { translateX: -60, translateY: -80 },   // document — middle-left
-    { translateX: 10, translateY: -90 },    // mic — top-right area
+    { translateX: -80, translateY: -10 }, // camera — bottom-left
+    { translateX: -60, translateY: -80 }, // document — middle-left
+    { translateX: 10, translateY: -90 }, // mic — top-right area
   ];
 
   return (
@@ -87,10 +95,7 @@ export default function FloatingActionMenu({ actions }: Props) {
       <TouchableWithoutFeedback onPress={closeMenu}>
         <Animated.View
           pointerEvents={overlayActive ? "auto" : "none"}
-          style={[
-            styles.overlay,
-            { opacity: progress },
-          ]}
+          style={[styles.overlay, { opacity: progress }]}
         />
       </TouchableWithoutFeedback>
 

@@ -102,10 +102,10 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: "#CA0DE7",
-    fontSize: 12,
+    fontSize: 11,
   },
   labelInactive: {
     color: "#FD89FB",
-    fontSize: 12,
+    fontSize: 11,
   },
 });
