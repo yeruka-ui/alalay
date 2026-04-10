@@ -22,12 +22,22 @@ export type MedicationItem = {
 type MedicationCardProps = {
   item: MedicationItem;
   onEdit: () => void;
-  onSave?: (updated: MedicationItem, applyToAll: boolean, originalName: string) => void;
+  onSave?: (
+    updated: MedicationItem,
+    applyToAll: boolean,
+    originalName: string,
+  ) => void;
   onAcceptSuggestion?: (id: string, suggestedName: string) => void;
   onDismissSuggestion?: (id: string) => void;
 };
 
-export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestion, onDismissSuggestion }: MedicationCardProps) {
+export default function MedicationCard({
+  item,
+  onEdit,
+  onSave,
+  onAcceptSuggestion,
+  onDismissSuggestion,
+}: MedicationCardProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [draft, setDraft] = useState(item);
 
@@ -40,14 +50,24 @@ export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestio
   const handleSave = () => {
     setModalVisible(false);
     // If name or dosage changed, ask to apply to all similar meds
-    if (draft.name !== item.name || draft.dosage !== item.dosage || draft.instructions !== item.instructions) {
+    if (
+      draft.name !== item.name ||
+      draft.dosage !== item.dosage ||
+      draft.instructions !== item.instructions
+    ) {
       Alert.alert(
         "Apply to all?",
         `Apply name, dosage, and instruction changes to all "${item.name}" entries?`,
         [
-          { text: "This one only", onPress: () => onSave?.(draft, false, item.name) },
-          { text: "Apply to all", onPress: () => onSave?.(draft, true, item.name) },
-        ]
+          {
+            text: "This one only",
+            onPress: () => onSave?.(draft, false, item.name),
+          },
+          {
+            text: "Apply to all",
+            onPress: () => onSave?.(draft, true, item.name),
+          },
+        ],
       );
     } else {
       onSave?.(draft, false, item.name);
@@ -60,25 +80,40 @@ export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestio
   };
 
   const confidenceBorderColor =
-    item.confidence === "low" ? "#FF6B6B" :
-      item.confidence === "medium" ? "#FFB84D" : "transparent";
+    item.confidence === "low"
+      ? "#FF6B6B"
+      : item.confidence === "medium"
+        ? "#FFB84D"
+        : "transparent";
 
   return (
     <>
-      <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: confidenceBorderColor }]}>
+      <View
+        style={[
+          styles.card,
+          { borderLeftWidth: 4, borderLeftColor: confidenceBorderColor },
+        ]}
+      >
         <View style={styles.content}>
           <Text style={styles.label}>Medication</Text>
           <Text style={styles.name}>{item.name}</Text>
           {item.suggestion && (
             <View style={styles.suggestionBanner}>
               <Text style={styles.suggestionText}>
-                Did you mean "<Text style={styles.suggestionName}>{item.suggestion}</Text>"?
+                Did you mean "
+                <Text style={styles.suggestionName}>{item.suggestion}</Text>"?
               </Text>
               <View style={styles.suggestionActions}>
-                <TouchableOpacity onPress={() => onAcceptSuggestion?.(item.id, item.suggestion!)}>
+                <TouchableOpacity
+                  onPress={() =>
+                    onAcceptSuggestion?.(item.id, item.suggestion!)
+                  }
+                >
                   <Text style={styles.acceptText}>Yes</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => onDismissSuggestion?.(item.id)}>
+                <TouchableOpacity
+                  onPress={() => onDismissSuggestion?.(item.id)}
+                >
                   <Text style={styles.dismissText}>No</Text>
                 </TouchableOpacity>
               </View>
@@ -86,7 +121,9 @@ export default function MedicationCard({ item, onEdit, onSave, onAcceptSuggestio
           )}
           {item.confidence === "low" && (
             <View style={styles.confidenceBanner}>
-              <Text style={styles.confidenceText}>⚠ This was unreadable — please review</Text>
+              <Text style={styles.confidenceText}>
+                ⚠ This was unreadable — please review
+              </Text>
             </View>
           )}
           <Text style={styles.instructions}>{item.instructions}</Text>
