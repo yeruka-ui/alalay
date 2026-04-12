@@ -1,10 +1,13 @@
 import { router } from "expo-router";
 import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/alalay_chat.styles";
 import { styles as sharedStyles } from "../styles/index.styles";
 
 export default function AlalayChat() {
+  const [text, onChangeText] = React.useState("");
+
   return (
     <>
       <View
@@ -29,9 +32,16 @@ export default function AlalayChat() {
         </View>
 
         {/*Located here is the Chat Panel: Consists of the chat messages and input field*/}
-        <View>
-          <View style={styles.chatPanel}></View>
-        </View>
+        <SafeAreaProvider>
+          <SafeAreaView>
+            <TextInput
+              style={styles.chatPanel}
+              onChangeText={onChangeText}
+              value={text}
+              placeholder="Start chatting"
+            />
+          </SafeAreaView>
+        </SafeAreaProvider>
       </View>
     </>
   );
