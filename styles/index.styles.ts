@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
@@ -120,8 +121,10 @@ export const styles = StyleSheet.create({
   //************************* record locker styles ****************************//
   topPanel: {
     backgroundColor: "#BE01DC",
-    borderRadius: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     padding: 35,
+    paddingTop: (Constants.statusBarHeight ?? 0) + 35,
   },
   //Panel for the Back Button and the Record Locker Title
   secondPanel: {
