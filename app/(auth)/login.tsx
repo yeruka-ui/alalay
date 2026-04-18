@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,17 +10,16 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { styles } from "../styles/login.styles";
+import { styles } from "@/styles/login.styles";
 import {
   getRememberedIdentifier,
   saveRememberedIdentifier,
   signInWithEmail,
-} from "../utils/auth";
+} from "@/utils/auth";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
-  const router = useRouter();
   const passwordRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState("");
@@ -60,11 +58,10 @@ export default function Login() {
     }
 
     await saveRememberedIdentifier(rememberMe ? email : null);
-    router.replace("/dashboard");
   }
 
   async function handleForgotPassword() {
-    const { supabase } = await import("../utils/supabase");
+    const { supabase } = await import("@/utils/supabase");
     if (email) {
       await supabase.auth.resetPasswordForEmail(email);
     }

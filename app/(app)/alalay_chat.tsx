@@ -2,8 +2,8 @@ import { router } from "expo-router";
 import React from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { styles } from "../styles/alalay_chat.styles";
-import { styles as sharedStyles } from "../styles/index.styles";
+import { styles } from "@/styles/alalay_chat.styles";
+import { styles as sharedStyles } from "@/styles/index.styles";
 
 export default function AlalayChat() {
   const [text, onChangeText] = React.useState("");

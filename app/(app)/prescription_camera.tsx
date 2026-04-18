@@ -18,10 +18,10 @@ import {
 } from "react-native";
 import MedicationCard, {
   type MedicationItem,
-} from "../components/MedicationCard";
-import { styles as sharedStyles } from "../styles/index.styles";
-import { savePrescription, uploadFile } from "../utils/database";
-import { validateMedicationName } from "../utils/medicationValidator";
+} from "@/components/MedicationCard";
+import { styles as sharedStyles } from "@/styles/index.styles";
+import { savePrescription, uploadFile } from "@/utils/database";
+import { validateMedicationName } from "@/utils/medicationValidator";
 
 type ScreenPhase = "capture" | "loading" | "results";
 
