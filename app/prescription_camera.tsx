@@ -277,7 +277,7 @@ Example for "Paracetamol 500mg 3 times a day after eating":
       await savePrescription(medications, uploadedImageUrl, undefined, "camera");
 
       Alert.alert("Added!", "Your medications have been saved to Alalay.", [
-        { text: "OK", onPress: () => router.back() },
+        { text: "OK", onPress: () => router.navigate("/dashboard") },
       ]);
     } catch (error: any) {
       Alert.alert("Save Error", error.message || "Failed to save medications.");
@@ -320,7 +320,7 @@ Example for "Paracetamol 500mg 3 times a day after eating":
         <View style={styles.headerBar}>
           <TouchableOpacity
             style={sharedStyles.backButton}
-            onPress={() => router.back()}
+            onPress={() => router.navigate("/dashboard")}
           >
             <Text style={sharedStyles.backArrow}>‹</Text>
           </TouchableOpacity>

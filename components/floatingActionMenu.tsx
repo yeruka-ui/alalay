@@ -55,7 +55,7 @@ export default function FloatingActionMenu({ actions }: Props) {
       toValue,
       duration: 250,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
