@@ -20,7 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { styles } from "../styles/index.styles";
+import { styles } from "@/styles/index.styles";
 
 export default function RecordLocker() {
   const [activeTab, setActiveTab] = useState("all");

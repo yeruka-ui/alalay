@@ -13,11 +13,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import FloatingActionMenu from "../components/floatingActionMenu";
-import TabFilterBar from "../components/tabFilterBar";
-import { styles } from "../styles/index.styles";
-import type { Medication, MedicationSchedule } from "../types/database";
-import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "../utils/database";
+import FloatingActionMenu from "@/components/floatingActionMenu";
+import TabFilterBar from "@/components/tabFilterBar";
+import { styles } from "@/styles/index.styles";
+import type { Medication, MedicationSchedule } from "@/types/database";
+import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************

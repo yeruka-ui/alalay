@@ -17,9 +17,9 @@ import Animated, {
 } from "react-native-reanimated";
 import MedicationCard, {
   type MedicationItem,
-} from "../components/MedicationCard";
-import { styles as sharedStyles } from "../styles/index.styles";
-import { styles } from "../styles/talk_to_alalay.styles";
+} from "@/components/MedicationCard";
+import { styles as sharedStyles } from "@/styles/index.styles";
+import { styles } from "@/styles/talk_to_alalay.styles";
 
 type Phase = "idle" | "listening" | "processing" | "results";
 

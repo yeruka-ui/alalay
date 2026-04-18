@@ -52,3 +52,12 @@ skills-lock.json
 git_status.*
 tracked_files.*
 git_log.txt
+
+# CLAUDE files from Klyde
+AUDIT.md
+CLAUDE.md
+TASK.md
+TASKS.md
+DESIGN.md
+PLANS.md
+
