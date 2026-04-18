@@ -152,7 +152,7 @@ export default function RecordLocker() {
             >
               <Text style={styles.backArrow}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.record_title}>Records</Text>
+            <Text style={styles.record_title} pointerEvents="none">Records</Text>
           </View>
 
           <View style={styles.searchContainer}>
