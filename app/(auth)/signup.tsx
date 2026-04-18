@@ -1,5 +1,5 @@
 import BackgroundCircle from "@/components/BackgroundCircle";
-import { styles as loginStyles } from "@/styles/login.styles";
+import { styles } from "@/styles/onboard.styles";
 import { signUpWithEmail } from "@/utils/auth";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -10,7 +10,6 @@ import {
     Platform,
     Pressable,
     ScrollView,
-    StyleSheet,
     Text,
     TextInput,
     useWindowDimensions,
@@ -25,9 +24,11 @@ export default function Signup() {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [role, setRole] = useState("");
-    const [agreed, setAgreed] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
 
     // Focus states
     const [fullNameFocused, setFullNameFocused] = useState(false);
@@ -44,7 +45,7 @@ export default function Signup() {
         EMAIL_REGEX.test(email) &&
         password.length >= 8 &&
         password === confirmPassword &&
-        agreed &&
+        role.length > 0 &&
         !loading;
 
     useEffect(() => {
@@ -53,17 +54,32 @@ export default function Signup() {
 
     const handleSignup = async () => {
         if (!canSubmit) return;
+        setEmailError(null);
+        setPasswordError(null);
+        setConfirmPasswordError(null);
+        setFormError(null);
         if (password !== confirmPassword) {
-            setError("Passwords do not match.");
+            setConfirmPasswordError("Passwords do not match.");
             return;
         }
         setLoading(true);
-        setError(null);
-        const { error: signupError } = await signUpWithEmail(email, password, fullName, role);
+        const { data, error: signupError } = await signUpWithEmail(email, password, fullName, role);
         setLoading(false);
         if (signupError) {
-            setError(signupError.message);
+            const msg = signupError.message.toLowerCase();
+            if (msg.includes("already registered") || msg.includes("already in use")) {
+                setEmailError("An account with this email already exists.");
+            } else if (msg.includes("password")) {
+                setPasswordError("Password does not meet requirements.");
+            } else {
+                setFormError("Something went wrong. Please try again.");
+            }
+            return;
         }
+        if (!data?.session) {
+            router.replace({ pathname: "/(auth)/login", params: { successMessage: "Check your email to confirm your account." } });
+        }
+        // session exists → root guard redirects to /dashboard
     };
 
     return (
@@ -73,11 +89,11 @@ export default function Signup() {
 
 
             <KeyboardAvoidingView
-                style={loginStyles.screen}
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.screen}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
             >
                 <ScrollView
-                    contentContainerStyle={loginStyles.scrollContent}
+                    contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                 >
                     <BackgroundCircle
@@ -85,17 +101,11 @@ export default function Signup() {
                         posY={height * -0.07}
                         blur={10}
                     />
-                    <Text style={loginStyles.title}>Create Account</Text>
+                    <Text style={styles.authTitle}>Create Account</Text>
 
-                    {error && (
-                        <View style={[loginStyles.errorBanner]}>
-                            <Text style={loginStyles.errorText}>{error}</Text>
-                        </View>
-                    )}
-
-                    <Text style={loginStyles.label}>Full Name</Text>
+                    <Text style={styles.label}>Full Name</Text>
                     <TextInput
-                        style={[signupStyles.input, fullNameFocused && loginStyles.inputFocused]}
+                        style={[styles.signupInput, fullNameFocused && styles.inputFocused]}
                         value={fullName}
                         onChangeText={setFullName}
                         autoCapitalize="words"
@@ -107,11 +117,11 @@ export default function Signup() {
                         placeholderTextColor="#9CA3AF"
                     />
 
-                    <Text style={loginStyles.label}>Email</Text>
+                    <Text style={styles.label}>Email</Text>
                     <TextInput
-                        style={[signupStyles.input, emailFocused && loginStyles.inputFocused]}
+                        style={[styles.signupInput, emailFocused && styles.inputFocused, !!emailError && styles.inputError]}
                         value={email}
-                        onChangeText={setEmail}
+                        onChangeText={(v) => { setEmail(v); setEmailError(null); }}
                         autoCapitalize="none"
                         keyboardType="email-address"
                         autoComplete="email"
@@ -121,12 +131,13 @@ export default function Signup() {
                         placeholder="Email"
                         placeholderTextColor="#9CA3AF"
                     />
+                    {!!emailError && <Text style={styles.fieldErrorText}>{emailError}</Text>}
 
-                    <Text style={loginStyles.label}>Password</Text>
+                    <Text style={styles.label}>Password</Text>
                     <TextInput
-                        style={[signupStyles.input, passwordFocused && loginStyles.inputFocused]}
+                        style={[styles.signupInput, passwordFocused && styles.inputFocused, !!passwordError && styles.inputError]}
                         value={password}
-                        onChangeText={setPassword}
+                        onChangeText={(v) => { setPassword(v); setPasswordError(null); }}
                         secureTextEntry
                         autoComplete="password-new"
                         textContentType="newPassword"
@@ -135,12 +146,13 @@ export default function Signup() {
                         placeholder="Password"
                         placeholderTextColor="#9CA3AF"
                     />
+                    {!!passwordError && <Text style={styles.fieldErrorText}>{passwordError}</Text>}
 
-                    {/* <Text style={loginStyles.label}>Confirm Password</Text> */}
+                    {/* <Text style={styles.label}>Confirm Password</Text> */}
                     <TextInput
-                        style={[signupStyles.input, confirmPasswordFocused && loginStyles.inputFocused]}
+                        style={[styles.signupInput, confirmPasswordFocused && styles.inputFocused, !!confirmPasswordError && styles.inputError]}
                         value={confirmPassword}
-                        onChangeText={setConfirmPassword}
+                        onChangeText={(v) => { setConfirmPassword(v); setConfirmPasswordError(null); }}
                         secureTextEntry
                         autoComplete="password-new"
                         textContentType="newPassword"
@@ -149,10 +161,11 @@ export default function Signup() {
                         placeholder="Confirm Password"
                         placeholderTextColor="#9CA3AF"
                     />
+                    {!!confirmPasswordError && <Text style={styles.fieldErrorText}>{confirmPasswordError}</Text>}
 
-                    <Text style={loginStyles.label}>Signing Up as</Text>
+                    <Text style={styles.label}>Signing Up as</Text>
                     <Pressable
-                        style={[signupStyles.input, { justifyContent: 'center' }, isRoleDropdownOpen && loginStyles.inputFocused]}
+                        style={[styles.signupInput, { justifyContent: 'center' }, isRoleDropdownOpen && styles.inputFocused]}
                         onPress={() => setIsRoleDropdownOpen(true)}
                     >
                         <Text style={{ color: role ? "#333" : "#9CA3AF", fontSize: 16 }}>
@@ -161,44 +174,44 @@ export default function Signup() {
                     </Pressable>
 
                     <Modal visible={isRoleDropdownOpen} transparent animationType="fade">
-                        <Pressable style={signupStyles.modalOverlay} onPress={() => setIsRoleDropdownOpen(false)}>
-                            <View style={signupStyles.dropdownContainer}>
-                                <Text style={signupStyles.dropdownTitle}>Select Role</Text>
+                        <Pressable style={styles.modalOverlay} onPress={() => setIsRoleDropdownOpen(false)}>
+                            <View style={styles.dropdownContainer}>
+                                <Text style={styles.dropdownTitle}>Select Role</Text>
 
                                 <Pressable
-                                    style={[signupStyles.dropdownOption, role === "Guardian" && signupStyles.dropdownOptionSelected]}
+                                    style={[styles.dropdownOption, role === "Guardian" && styles.dropdownOptionSelected]}
                                     onPress={() => { setRole("Guardian"); setIsRoleDropdownOpen(false); }}
                                 >
-                                    <Text style={[signupStyles.dropdownOptionText, role === "Guardian" && signupStyles.dropdownOptionTextSelected]}>Guardian</Text>
+                                    <Text style={[styles.dropdownOptionText, role === "Guardian" && styles.dropdownOptionTextSelected]}>Guardian</Text>
                                 </Pressable>
 
-                                <View style={signupStyles.dropdownDivider} />
+                                <View style={styles.dropdownDivider} />
 
                                 <Pressable
-                                    style={[signupStyles.dropdownOption, role === "Patient" && signupStyles.dropdownOptionSelected]}
+                                    style={[styles.dropdownOption, role === "Patient" && styles.dropdownOptionSelected]}
                                     onPress={() => { setRole("Patient"); setIsRoleDropdownOpen(false); }}
                                 >
-                                    <Text style={[signupStyles.dropdownOptionText, role === "Patient" && signupStyles.dropdownOptionTextSelected]}>Patient</Text>
+                                    <Text style={[styles.dropdownOptionText, role === "Patient" && styles.dropdownOptionTextSelected]}>Patient</Text>
                                 </Pressable>
                             </View>
                         </Pressable>
                     </Modal>
 
-                    <Pressable
-                        style={signupStyles.checkboxContainer}
-                        onPress={() => setAgreed(!agreed)}
+                    <View
+                        style={styles.checkboxContainer}
                         accessibilityRole="checkbox"
-                        accessibilityState={{ checked: agreed }}
                     >
-                        <Text style={signupStyles.checkboxText}>
-                            By clicking Create Account, You agree to the <Text style={signupStyles.checkboxTextBold}>Terms & Conditions</Text> and <Text style={signupStyles.checkboxTextBold}>Privacy Policy</Text>
+                        <Text style={styles.checkboxText}>
+                            By clicking Create Account, You agree to the <Text style={styles.checkboxTextBold}>Terms & Conditions</Text> and <Text style={styles.checkboxTextBold}>Privacy Policy</Text>
                         </Text>
-                    </Pressable>
+                    </View>
+
+                    {!!formError && <Text style={[styles.fieldErrorText, { textAlign: "center" }]}>{formError}</Text>}
 
                     <Pressable
                         style={[
-                            loginStyles.primaryButton,
-                            !canSubmit && loginStyles.primaryButtonDisabled,
+                            styles.authButton,
+                            !canSubmit && styles.authButtonDisabled,
                         ]}
                         onPress={handleSignup}
                         disabled={!canSubmit}
@@ -207,17 +220,17 @@ export default function Signup() {
                         {loading ? (
                             <ActivityIndicator color="#DD00FF" />
                         ) : (
-                            <Text style={loginStyles.primaryButtonText}>Create Account</Text>
+                            <Text style={styles.authButtonText}>Create Account</Text>
                         )}
                     </Pressable>
 
                     <Pressable
-                        style={signupStyles.signInButton}
+                        style={styles.signInButton}
                         onPress={() => router.push("/(auth)/login")}
                         accessibilityRole="button"
                     >
-                        <Text style={loginStyles.signUpText}>
-                            Already have an account? <Text style={loginStyles.signUpTextBold}>Sign In</Text>
+                        <Text style={styles.signUpText}>
+                            Already have an account? <Text style={styles.signUpTextBold}>Sign In</Text>
                         </Text>
                     </Pressable>
 
@@ -226,106 +239,3 @@ export default function Signup() {
         </View>
     );
 }
-
-const signupStyles = StyleSheet.create({
-    input: {
-        height: 52,
-        backgroundColor: "#F0F0F0",
-        borderRadius: 26,
-        paddingHorizontal: 20,
-        fontSize: 16,
-        color: "#333",
-        marginBottom: 16,
-    },
-    checkboxContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        // justifyContent: "center",
-        marginBottom: 24,
-        marginTop: 8,
-        paddingHorizontal: 4,
-    },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: "#ffffff",
-        marginRight: 10,
-        justifyContent: "center",
-        alignItems: "center",
-
-    },
-    checkboxChecked: {
-        backgroundColor: "#ffffff",
-    },
-    checkboxInner: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: "#DD00FF",
-    },
-    checkboxText: {
-        color: "#ffffff",
-        fontSize: 12,
-        flex: 1,
-        textAlign: "center"
-    },
-    checkboxTextBold: {
-        fontWeight: "700",
-    },
-    signInButton: {
-        height: 52,
-        borderWidth: 1,
-        borderColor: "transparent", // Dark purple border matching the screenshot closely
-        backgroundColor: "transparent",
-        borderRadius: 26,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    dropdownContainer: {
-        width: "80%",
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    dropdownTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#333",
-        marginBottom: 16,
-        textAlign: "center",
-    },
-    dropdownOption: {
-        paddingVertical: 14,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-    },
-    dropdownOptionSelected: {
-        backgroundColor: "rgba(142, 2, 184, 0.1)",
-    },
-    dropdownOptionText: {
-        fontSize: 16,
-        color: "#333",
-        textAlign: "center",
-    },
-    dropdownOptionTextSelected: {
-        color: "#8E02B8",
-        fontWeight: "bold",
-    },
-    dropdownDivider: {
-        height: 1,
-        backgroundColor: "#E0E0E0",
-        marginVertical: 4,
-    }
-});

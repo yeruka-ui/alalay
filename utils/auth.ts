@@ -14,14 +14,14 @@ export async function signUpWithEmail(
   fullName: string,
   role: string
 ) {
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { full_name: fullName, role },
     },
   });
-  return { error };
+  return { data, error };
 }
 
 export async function saveRememberedIdentifier(value: string | null) {

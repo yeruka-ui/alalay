@@ -1,12 +1,12 @@
 import BackgroundCircle from "@/components/BackgroundCircle";
-import { styles } from "@/styles/login.styles";
+import { styles } from "@/styles/onboard.styles";
 import {
   getRememberedIdentifier,
   saveRememberedIdentifier,
   signInWithEmail,
 } from "@/utils/auth";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,6 +25,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function Login() {
   const { width, height } = useWindowDimensions();
   const router = useRouter();
+  const { successMessage } = useLocalSearchParams<{ successMessage?: string }>();
+  const [visibleSuccessMessage, setVisibleSuccessMessage] = useState<string | undefined>(
+    successMessage as string | undefined
+  );
   const passwordRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState("");
@@ -35,6 +39,12 @@ export default function Login() {
   const [error, setError] = useState("");
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+
+  useEffect(() => {
+    if (!visibleSuccessMessage) return;
+    const timer = setTimeout(() => setVisibleSuccessMessage(undefined), 10000);
+    return () => clearTimeout(timer);
+  }, [visibleSuccessMessage]);
 
   useEffect(() => {
     getRememberedIdentifier().then((saved) => {
@@ -63,6 +73,7 @@ export default function Login() {
     }
 
     await saveRememberedIdentifier(rememberMe ? email : null);
+    setLoading(false);
   }
 
   async function handleForgotPassword() {
@@ -90,8 +101,13 @@ export default function Login() {
             posY={height * -0.25}
             blur={10}
           />
-          <Text style={styles.title}>Sign in</Text>
+          <Text style={styles.authTitle}>Sign in</Text>
 
+          {!!visibleSuccessMessage && (
+            <View style={styles.successBanner} accessibilityRole="alert">
+              <Text style={styles.successText}>{visibleSuccessMessage}</Text>
+            </View>
+          )}
           {!!error && (
             <View
               style={styles.errorBanner}
@@ -104,7 +120,7 @@ export default function Login() {
 
           {/* <Text style={styles.label}>Email</Text> */}
           <TextInput
-            style={[styles.input, emailFocused && styles.inputFocused]}
+            style={[styles.authInput, emailFocused && styles.inputFocused]}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -159,8 +175,8 @@ export default function Login() {
 
           <Pressable
             style={[
-              styles.primaryButton,
-              !canSubmit && styles.primaryButtonDisabled,
+              styles.authButton,
+              !canSubmit && styles.authButtonDisabled,
             ]}
             onPress={handleSubmit}
             disabled={!canSubmit}
@@ -170,7 +186,7 @@ export default function Login() {
             {loading ? (
               <ActivityIndicator color="#DD00FF" />
             ) : (
-              <Text style={styles.primaryButtonText}>Sign in</Text>
+              <Text style={styles.authButtonText}>Sign in</Text>
             )}
           </Pressable>
 

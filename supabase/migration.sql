@@ -135,6 +135,9 @@ create policy medical_records_policy on public.medical_records
 -- ============================================================
 -- 7. STORAGE BUCKETS
 -- ============================================================
+-- NOTE: Run the migration below (section 8) separately if the
+-- schema was already applied without it.
+-- ============================================================
 insert into storage.buckets (id, name, public)
 values
   ('prescriptions', 'prescriptions', false),
@@ -148,3 +151,24 @@ create policy storage_prescriptions_policy on storage.objects
 create policy storage_medical_records_policy on storage.objects
   for all to authenticated
   using (bucket_id = 'medical-records' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================
+-- 8. PROFILES — add full_name + role columns
+-- Run this block if the schema above was already applied.
+-- ============================================================
+alter table public.profiles
+  add column if not exists full_name text,
+  add column if not exists role text;
+
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (auth_id, full_name, role)
+  values (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'role'
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
