@@ -287,7 +287,7 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
           >
             <Text style={sharedStyles.backArrow}>‹</Text>
           </TouchableOpacity>
-          <Text style={sharedStyles.record_title}>Talk to Alalay</Text>
+          <Text style={sharedStyles.record_title} pointerEvents="none">Talk to Alalay</Text>
         </View>
 
         {phase === "results" ? (
