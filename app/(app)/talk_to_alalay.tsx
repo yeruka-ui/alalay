@@ -259,7 +259,7 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
 
   const handleAddToAlalay = () => {
     Alert.alert("Added!", "Your medications have been added to Alalay.", [
-      { text: "OK", onPress: () => router.back() },
+      { text: "OK", onPress: () => router.navigate("/dashboard") },
     ]);
   };
 
@@ -283,7 +283,7 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
         <View style={sharedStyles.secondPanel}>
           <TouchableOpacity
             style={sharedStyles.backButton}
-            onPress={() => router.back()}
+            onPress={() => router.navigate("/dashboard")}
           >
             <Text style={sharedStyles.backArrow}>‹</Text>
           </TouchableOpacity>

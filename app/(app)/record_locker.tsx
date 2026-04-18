@@ -148,7 +148,7 @@ export default function RecordLocker() {
           <View style={styles.secondPanel}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => router.back()}
+              onPress={() => router.navigate("/dashboard")}
             >
               <Text style={styles.backArrow}>‹</Text>
             </TouchableOpacity>
