@@ -18,6 +18,7 @@ import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
 import type { Medication, MedicationSchedule } from "@/types/database";
 import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
+import { supabase } from "@/utils/supabase";
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
@@ -189,6 +190,12 @@ export default function Dashboard() {
 
               <TouchableOpacity style={styles.purpleButton}>
                 <Text style={styles.addTaskText}>+ Add Task</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => supabase.auth.signOut()}
+                style={{ marginLeft: 8, backgroundColor: "#850099", borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 }}
+              >
+                <Text style={{ color: "#FFF", fontSize: 12 }}>Logout</Text>
               </TouchableOpacity>
             </View>
 
