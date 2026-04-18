@@ -24,7 +24,7 @@ export default function AlalayChat() {
           <View style={sharedStyles.secondPanel}>
             <TouchableOpacity
               style={sharedStyles.backButton}
-              onPress={() => router.back()}
+              onPress={() => router.navigate("/dashboard")}
             >
               <Text style={sharedStyles.backArrow}>‹</Text>
             </TouchableOpacity>
