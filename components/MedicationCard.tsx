@@ -21,7 +21,7 @@ export type MedicationItem = {
 
 type MedicationCardProps = {
   item: MedicationItem;
-  onEdit: () => void;
+  onEdit?: () => void;
   onSave?: (
     updated: MedicationItem,
     applyToAll: boolean,
@@ -29,6 +29,8 @@ type MedicationCardProps = {
   ) => void;
   onAcceptSuggestion?: (id: string, suggestedName: string) => void;
   onDismissSuggestion?: (id: string) => void;
+  status?: "pending" | "taken";
+  onTake?: () => void;
 };
 
 export default function MedicationCard({
@@ -37,6 +39,8 @@ export default function MedicationCard({
   onSave,
   onAcceptSuggestion,
   onDismissSuggestion,
+  status,
+  onTake,
 }: MedicationCardProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [draft, setDraft] = useState(item);
@@ -44,7 +48,7 @@ export default function MedicationCard({
   const handleEdit = () => {
     setDraft(item);
     setModalVisible(true);
-    onEdit();
+    onEdit?.();
   };
 
   const handleSave = () => {
@@ -130,12 +134,22 @@ export default function MedicationCard({
         </View>
 
         <View style={styles.rightColumn}>
-          <View style={styles.timeBadge}>
-            <Text style={styles.timeText}>{item.time}</Text>
-          </View>
-          <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-            <Text style={styles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
+          {item.time ? (
+            <View style={styles.timeBadge}>
+              <Text style={styles.timeText}>{item.time}</Text>
+            </View>
+          ) : null}
+          {status === "pending" && onTake ? (
+            <TouchableOpacity style={styles.editButton} onPress={onTake}>
+              <Text style={styles.editButtonText}>Take</Text>
+            </TouchableOpacity>
+          ) : status === "taken" ? (
+            <Text style={styles.takenText}>✓ Taken</Text>
+          ) : onEdit ? (
+            <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+              <Text style={styles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
@@ -316,6 +330,11 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  takenText: {
+    color: "#4CAF50",
+    fontWeight: "600",
+    fontSize: 13,
   },
   suggestionBanner: {
     backgroundColor: "#FEE8FE",
