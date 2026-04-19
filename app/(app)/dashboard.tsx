@@ -1,5 +1,5 @@
 import FloatingActionMenu from "@/components/floatingActionMenu";
-import MedicationCard, { type MedicationItem } from "@/components/MedicationCard";
+import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
 import type { Medication, MedicationSchedule } from "@/types/database";
@@ -271,13 +271,12 @@ export default function Dashboard() {
               <MedicationCard
                 key={schedule.id}
                 item={{
-                  id: schedule.id,
+                  id: String(schedule.id),
                   name: schedule.medication?.name ?? "",
                   instructions: schedule.medication?.instructions ?? "",
                   dosage: schedule.medication?.dosage ?? undefined,
                   time: formatTime(schedule.scheduled_time),
                 }}
-                onEdit={() => {}}
                 status={schedule.status as "pending" | "taken"}
                 onTake={async () => {
                   await updateScheduleStatus(schedule.id, "taken");
@@ -292,13 +291,12 @@ export default function Dashboard() {
               <MedicationCard
                 key={med.id}
                 item={{
-                  id: med.id,
+                  id: String(med.id),
                   name: med.name,
                   instructions: med.instructions ?? "",
                   dosage: med.dosage ?? undefined,
                   time: "",
                 }}
-                onEdit={() => {}}
               />
             ))}
           </ScrollView>

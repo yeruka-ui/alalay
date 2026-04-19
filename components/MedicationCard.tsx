@@ -21,7 +21,7 @@ export type MedicationItem = {
 
 type MedicationCardProps = {
   item: MedicationItem;
-  onEdit: () => void;
+  onEdit?: () => void;
   onSave?: (
     updated: MedicationItem,
     applyToAll: boolean,
@@ -145,11 +145,11 @@ export default function MedicationCard({
             </TouchableOpacity>
           ) : status === "taken" ? (
             <Text style={styles.takenText}>✓ Taken</Text>
-          ) : (
+          ) : onEdit ? (
             <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
 
