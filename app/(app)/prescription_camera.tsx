@@ -1,3 +1,9 @@
+import MedicationCard, {
+  type MedicationItem,
+} from "@/components/MedicationCard";
+import { styles as sharedStyles } from "@/styles/index.styles";
+import { savePrescription, uploadFile } from "@/utils/database";
+import { validateMedicationName } from "@/utils/medicationValidator";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
@@ -18,12 +24,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MedicationCard, {
-  type MedicationItem,
-} from "@/components/MedicationCard";
-import { styles as sharedStyles } from "@/styles/index.styles";
-import { savePrescription, uploadFile } from "@/utils/database";
-import { validateMedicationName } from "@/utils/medicationValidator";
 
 type ScreenPhase = "capture" | "loading" | "results";
 
@@ -122,7 +122,7 @@ export default function PrescriptionCamera() {
       }
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
