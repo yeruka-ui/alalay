@@ -1,3 +1,10 @@
+import FloatingActionMenu from "@/components/floatingActionMenu";
+import MedicationCard, { type MedicationItem } from "@/components/MedicationCard";
+import TabFilterBar from "@/components/tabFilterBar";
+import { styles } from "@/styles/index.styles";
+import type { Medication, MedicationSchedule } from "@/types/database";
+import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
+import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -13,13 +20,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import FloatingActionMenu from "@/components/floatingActionMenu";
-import TabFilterBar from "@/components/tabFilterBar";
-import { styles } from "@/styles/index.styles";
-import type { Medication, MedicationSchedule } from "@/types/database";
-import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
-import { fromDbTime } from "@/utils/timeFormat";
-import { supabase } from "@/utils/supabase";
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
@@ -124,6 +124,15 @@ export default function Dashboard() {
     dates.push(new Date(year, month + 1, 2));
 
     return dates;
+  };
+
+  const formatTime = (t: string | null) => {
+    if (!t) return "No time set";
+    const [h, m] = t.split(":");
+    const hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${m} ${ampm}`;
   };
 
   const dates = generateDates(selectedDate);
@@ -259,77 +268,38 @@ export default function Dashboard() {
         ) : filteredSchedules.length > 0 ? (
           <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
             {filteredSchedules.map((schedule) => (
-              <View
+              <MedicationCard
                 key={schedule.id}
-                style={{
-                  backgroundColor: "#FFF",
-                  borderRadius: 16,
-                  padding: 16,
-                  marginBottom: 10,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  shadowColor: "#000",
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
+                item={{
+                  id: schedule.id,
+                  name: schedule.medication?.name ?? "",
+                  instructions: schedule.medication?.instructions ?? "",
+                  dosage: schedule.medication?.dosage ?? undefined,
+                  time: formatTime(schedule.scheduled_time),
                 }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: "600", color: "#333" }}>
-                    {schedule.medication?.name}
-                  </Text>
-                  {schedule.medication?.dosage && (
-                    <Text style={{ fontSize: 13, color: "#999", marginTop: 2 }}>
-                      {schedule.medication.dosage}
-                    </Text>
-                  )}
-                  <Text style={{ fontSize: 13, color: "#B902D6", marginTop: 2 }}>
-                    {schedule.scheduled_time ? fromDbTime(schedule.scheduled_time) : "No time set"}
-                  </Text>
-                </View>
-                {schedule.status === "pending" && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      await updateScheduleStatus(schedule.id, "taken");
-                      fetchDashboardData();
-                    }}
-                    style={{
-                      backgroundColor: "#B902D6",
-                      borderRadius: 20,
-                      paddingVertical: 8,
-                      paddingHorizontal: 16,
-                    }}
-                  >
-                    <Text style={{ color: "#FFF", fontSize: 13, fontWeight: "600" }}>Take</Text>
-                  </TouchableOpacity>
-                )}
-                {schedule.status === "taken" && (
-                  <Text style={{ color: "#4CAF50", fontWeight: "600" }}>✓ Taken</Text>
-                )}
-              </View>
+                onEdit={() => {}}
+                status={schedule.status as "pending" | "taken"}
+                onTake={async () => {
+                  await updateScheduleStatus(schedule.id, "taken");
+                  fetchDashboardData();
+                }}
+              />
             ))}
           </ScrollView>
         ) : activeTab === "medication" && allMedications.length > 0 ? (
           <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
             {allMedications.map((med) => (
-              <View
+              <MedicationCard
                 key={med.id}
-                style={{
-                  backgroundColor: "#FFF",
-                  borderRadius: 16,
-                  padding: 16,
-                  marginBottom: 10,
-                  shadowColor: "#000",
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
+                item={{
+                  id: med.id,
+                  name: med.name,
+                  instructions: med.instructions ?? "",
+                  dosage: med.dosage ?? undefined,
+                  time: "",
                 }}
-              >
-                <Text style={{ fontSize: 16, fontWeight: "600", color: "#333" }}>{med.name}</Text>
-                {med.dosage && <Text style={{ fontSize: 13, color: "#999", marginTop: 2 }}>{med.dosage}</Text>}
-                {med.instructions && <Text style={{ fontSize: 13, color: "#666", marginTop: 2 }}>{med.instructions}</Text>}
-              </View>
+                onEdit={() => {}}
+              />
             ))}
           </ScrollView>
         ) : (
