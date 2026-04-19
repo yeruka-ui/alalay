@@ -20,9 +20,13 @@ export default function Onboard() {
                 posY={height * 0.6}
                 scaleX={0.7}
                 scaleY={1.4}
-                blur={30}
                 colors={["#c300e1", "#DD00FF"]}
+                blurIntensity={30}
+                blurTint="light"
             />
+
+
+
 
             <View style={styles.contentContainer}>
 

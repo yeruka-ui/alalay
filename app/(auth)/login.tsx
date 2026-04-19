@@ -99,7 +99,8 @@ export default function Login() {
           <BackgroundCircle
             posX={width * 0}
             posY={height * -0.25}
-            blur={10}
+            blurIntensity={30}
+            blurTint="light"
           />
           <Text style={styles.authTitle}>Sign in</Text>
 

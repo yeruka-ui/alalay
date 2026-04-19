@@ -48,7 +48,7 @@ export default function MedicationCard({
   const handleEdit = () => {
     setDraft(item);
     setModalVisible(true);
-    onEdit();
+    onEdit?.();
   };
 
   const handleSave = () => {

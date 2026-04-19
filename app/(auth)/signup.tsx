@@ -99,7 +99,8 @@ export default function Signup() {
                     <BackgroundCircle
                         posX={width * 0}
                         posY={height * -0.07}
-                        blur={10}
+                        blurIntensity={30}
+                        blurTint="light"
                     />
                     <Text style={styles.authTitle}>Create Account</Text>
 

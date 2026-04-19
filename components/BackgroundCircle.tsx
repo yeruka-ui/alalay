@@ -1,5 +1,6 @@
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { useWindowDimensions } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 
 type Props = {
   mx?: number;
@@ -12,6 +13,8 @@ type Props = {
   scaleY?: number;
   colors?: [string, string, ...string[]];
   blur?: number;
+  blurIntensity?: number;
+  blurTint?: "light" | "dark" | "default";
 };
 
 export default function BackgroundCircle({
@@ -25,6 +28,8 @@ export default function BackgroundCircle({
   scaleY = 1,
   colors = ["#DD00FF", "#AD00C8"],
   blur = 30,
+  blurIntensity,
+  blurTint = "light",
 }: Props) {
   const { width, height } = useWindowDimensions();
 
@@ -36,28 +41,43 @@ export default function BackgroundCircle({
   const finalTranslateY = translateY ?? (((height - size) / 2) - posY);
 
   return (
-    <LinearGradient
-      colors={colors}
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        pointerEvents: "none",
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        transform: [
-          { translateX: finalTranslateX },
-          { translateY: finalTranslateY },
-          { scaleX },
-          { scaleY }
-        ],
-        // filter: `blur(${blur}px)` might be ignored on Native Android, but won't crash unless it's on an incompatible view. 
-        // For safe measure:
-        ...(blur ? { filter: `blur(${blur}px)` as any } : {}),
-      }}
-    />
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
+      <LinearGradient
+        colors={colors}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          transform: [
+            { translateX: finalTranslateX },
+            { translateY: finalTranslateY },
+            { scaleX },
+            { scaleY }
+          ],
+          // filter: `blur(${blur}px)` might be ignored on Native Android, but won't crash unless it's on an incompatible view.
+          // For safe measure:
+          ...(blur ? { filter: `blur(${blur}px)` as any } : {}),
+        }}
+      />
+
+      {blurIntensity != null && (
+        <BlurView
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
+          intensity={blurIntensity}
+          tint={blurTint}
+        />
+      )}
+    </View>
   );
 }
