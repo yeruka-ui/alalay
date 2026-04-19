@@ -1,15 +1,19 @@
 import { Audio } from "expo-av";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -20,6 +24,7 @@ import MedicationCard, {
 } from "@/components/MedicationCard";
 import { styles as sharedStyles } from "@/styles/index.styles";
 import { styles } from "@/styles/talk_to_alalay.styles";
+import { savePrescription } from "@/utils/database";
 
 type Phase = "idle" | "listening" | "processing" | "results";
 
@@ -39,6 +44,9 @@ export default function TalkToAlalay() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [isHearing, setIsHearing] = useState(false);
   const [medications, setMedications] = useState<MedicationItem[]>([]);
+  const [startDate, setStartDate] = useState(new Date());
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const hearingRef = useRef(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
 
@@ -257,10 +265,19 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
     );
   };
 
-  const handleAddToAlalay = () => {
-    Alert.alert("Added!", "Your medications have been added to Alalay.", [
-      { text: "OK", onPress: () => router.navigate("/dashboard") },
-    ]);
+  const handleAddToAlalay = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await savePrescription(medications, undefined, undefined, "manual", startDate);
+      Alert.alert("Added!", "Your medications have been saved to Alalay.", [
+        { text: "OK", onPress: () => router.navigate("/dashboard") },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Save Error", error.message || "Failed to save medications.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTryAgain = () => {
@@ -305,12 +322,24 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
                 />
               ))}
             </ScrollView>
+            <TouchableOpacity
+              style={styles.startDateRow}
+              onPress={() => setDatePickerOpen(true)}
+            >
+              <Feather name="calendar" size={14} color="#850099" style={{ marginRight: 6 }} />
+              <Text style={styles.startDateLabel}>Start date: </Text>
+              <Text style={styles.startDateValue}>
+                {startDate.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.bottomBar}>
               <TouchableOpacity
-                style={styles.addButton}
+                style={[styles.addButton, isSaving && { opacity: 0.6 }]}
                 onPress={handleAddToAlalay}
+                disabled={isSaving}
               >
-                <Text style={styles.bottomButtonText}>Add to Alalay</Text>
+                <Text style={styles.bottomButtonText}>{isSaving ? "Saving..." : "Add to Alalay"}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.retakeButton}
@@ -319,6 +348,44 @@ Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","
                 <Text style={styles.bottomButtonText}>Try again</Text>
               </TouchableOpacity>
             </View>
+
+            {Platform.OS === "ios" && datePickerOpen && (
+              <Modal
+                visible={datePickerOpen}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setDatePickerOpen(false)}
+              >
+                <View style={styles.iosPickerContainer}>
+                  <TouchableOpacity
+                    onPress={() => setDatePickerOpen(false)}
+                    style={styles.iosPickerDoneBtn}
+                  >
+                    <Text style={styles.iosPickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                  <DateTimePicker
+                    value={startDate}
+                    mode="date"
+                    display="spinner"
+                    onChange={(_: DateTimePickerEvent, date?: Date) => {
+                      if (date) setStartDate(date);
+                    }}
+                  />
+                </View>
+              </Modal>
+            )}
+
+            {Platform.OS === "android" && datePickerOpen && (
+              <DateTimePicker
+                value={startDate}
+                mode="date"
+                display="default"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  setDatePickerOpen(false);
+                  if (event.type !== "dismissed" && date) setStartDate(date);
+                }}
+              />
+            )}
           </>
         ) : (
           <View style={styles.content}>

@@ -18,6 +18,7 @@ import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
 import type { Medication, MedicationSchedule } from "@/types/database";
 import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
+import { fromDbTime } from "@/utils/timeFormat";
 import { supabase } from "@/utils/supabase";
 
 export default function Dashboard() {
@@ -284,7 +285,7 @@ export default function Dashboard() {
                     </Text>
                   )}
                   <Text style={{ fontSize: 13, color: "#B902D6", marginTop: 2 }}>
-                    {schedule.scheduled_time ?? "No time set"}
+                    {schedule.scheduled_time ? fromDbTime(schedule.scheduled_time) : "No time set"}
                   </Text>
                 </View>
                 {schedule.status === "pending" && (

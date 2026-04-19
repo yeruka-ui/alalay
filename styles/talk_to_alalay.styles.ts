@@ -85,4 +85,39 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  startDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  startDateLabel: {
+    fontSize: 13,
+    color: "#666",
+  },
+  startDateValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#850099",
+  },
+  iosPickerContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+  },
+  iosPickerDoneBtn: {
+    alignSelf: "flex-end",
+    padding: 16,
+  },
+  iosPickerDoneText: {
+    color: "#B902D6",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

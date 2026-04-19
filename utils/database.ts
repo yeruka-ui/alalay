@@ -6,6 +6,7 @@ import type {
   Prescription,
 } from "@/types/database";
 import { supabase } from "./supabase";
+import { toDbTime } from "./timeFormat";
 
 // ─── Auth Helpers ────────────────────────────────────────────
 
@@ -23,7 +24,8 @@ export async function savePrescription(
   medications: MedicationItem[],
   imageUrl?: string,
   rawOcrText?: string,
-  source: "camera" | "gallery" | "manual" = "camera"
+  source: "camera" | "gallery" | "manual" = "camera",
+  startDate: Date = new Date()
 ): Promise<{ prescription: Prescription; medications: Medication[] }> {
   const userId = await getCurrentUserId();
 
@@ -44,7 +46,7 @@ export async function savePrescription(
     original_name: med.suggestion ? med.name : null,
     dosage: med.dosage ?? null,
     instructions: med.instructions,
-    time: med.time,
+    time: med.time ? toDbTime(med.time) : null,
     confidence: med.confidence ?? null,
   }));
 
@@ -54,6 +56,13 @@ export async function savePrescription(
     .select();
 
   if (medError) throw medError;
+
+  // Create schedule rows for the next 7 days starting from startDate
+  await Promise.all(
+    (savedMeds ?? []).map((med) =>
+      createSchedulesForMedication(med.id, startDate, 7)
+    )
+  );
 
   return { prescription, medications: savedMeds ?? [] };
 }
@@ -113,7 +122,6 @@ export async function createSchedulesForMedication(
 ): Promise<void> {
   const userId = await getCurrentUserId();
 
-  // Get the medication's time
   const { data: med } = await supabase
     .from("medications")
     .select("time")

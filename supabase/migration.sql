@@ -172,3 +172,13 @@ begin
   return new;
 end;
 $$ language plpgsql security definer;
+
+-- ============================================================
+-- 9. Migrate time columns to timetz + wire schedules
+-- Drop + recreate (dev phase, no prod data to preserve)
+-- ============================================================
+alter table public.medications drop column if exists time;
+alter table public.medications add column time timetz;
+
+alter table public.medication_schedules drop column if exists scheduled_time;
+alter table public.medication_schedules add column scheduled_time timetz;
