@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +10,7 @@ import {
   Easing,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -259,6 +261,8 @@ Example for "Paracetamol 500mg 3 times a day after eating":
   };
 
   const [isSaving, setIsSaving] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const handleAddToAlalay = async () => {
     if (isSaving) return;
@@ -274,7 +278,7 @@ Example for "Paracetamol 500mg 3 times a day after eating":
         }
       }
 
-      await savePrescription(medications, uploadedImageUrl, undefined, "camera");
+      await savePrescription(medications, uploadedImageUrl, undefined, "camera", startDate);
 
       Alert.alert("Added!", "Your medications have been saved to Alalay.", [
         { text: "OK", onPress: () => router.navigate("/dashboard") },
@@ -352,6 +356,17 @@ Example for "Paracetamol 500mg 3 times a day after eating":
               ))}
             </ScrollView>
 
+            <TouchableOpacity
+              style={styles.startDateRow}
+              onPress={() => setDatePickerOpen(true)}
+            >
+              <Feather name="calendar" size={14} color="#850099" style={{ marginRight: 6 }} />
+              <Text style={styles.startDateLabel}>Start date: </Text>
+              <Text style={styles.startDateValue}>
+                {startDate.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.bottomBar}>
               <TouchableOpacity
                 style={[styles.addButton, isSaving && styles.disabledButton]}
@@ -377,6 +392,44 @@ Example for "Paracetamol 500mg 3 times a day after eating":
                 <Text style={styles.bottomButtonText}>+ Add manually</Text>
               </TouchableOpacity>
             </View>
+
+            {Platform.OS === "ios" && datePickerOpen && (
+              <Modal
+                visible={datePickerOpen}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setDatePickerOpen(false)}
+              >
+                <View style={styles.iosPickerContainer}>
+                  <TouchableOpacity
+                    onPress={() => setDatePickerOpen(false)}
+                    style={styles.iosPickerDoneBtn}
+                  >
+                    <Text style={styles.iosPickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                  <DateTimePicker
+                    value={startDate}
+                    mode="date"
+                    display="spinner"
+                    onChange={(_: DateTimePickerEvent, date?: Date) => {
+                      if (date) setStartDate(date);
+                    }}
+                  />
+                </View>
+              </Modal>
+            )}
+
+            {Platform.OS === "android" && datePickerOpen && (
+              <DateTimePicker
+                value={startDate}
+                mode="date"
+                display="default"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  setDatePickerOpen(false);
+                  if (event.type !== "dismissed" && date) setStartDate(date);
+                }}
+              />
+            )}
 
             <Modal
               visible={manualModalVisible}
@@ -709,6 +762,41 @@ const styles = StyleSheet.create({
   modalSaveText: {
     color: "#FFF",
     fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  startDateRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  startDateLabel: {
+    fontSize: 13,
+    color: "#666",
+  },
+  startDateValue: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: "#850099",
+  },
+  iosPickerContainer: {
+    position: "absolute" as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+  },
+  iosPickerDoneBtn: {
+    alignSelf: "flex-end" as const,
+    padding: 16,
+  },
+  iosPickerDoneText: {
+    color: "#B902D6",
+    fontSize: 16,
     fontWeight: "600" as const,
   },
 });

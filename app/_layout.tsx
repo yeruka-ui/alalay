@@ -1,8 +1,8 @@
+import { supabase } from "@/utils/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { supabase } from "@/utils/supabase";
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -24,7 +24,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!ready) return;
     const inAuth = segments[0] === "(auth)";
-    if (!session && !inAuth) router.replace("/login");
+    if (!session && !inAuth) router.replace("/onboard");
     else if (session && inAuth) router.replace("/dashboard");
   }, [ready, session, segments]);
 

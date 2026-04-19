@@ -1,4 +1,12 @@
+import BackgroundCircle from "@/components/BackgroundCircle";
+import { styles } from "@/styles/onboard.styles";
+import {
+  getRememberedIdentifier,
+  saveRememberedIdentifier,
+  signInWithEmail,
+} from "@/utils/auth";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -8,18 +16,19 @@ import {
   ScrollView,
   Text,
   TextInput,
-  View,
+  useWindowDimensions,
+  View
 } from "react-native";
-import { styles } from "@/styles/login.styles";
-import {
-  getRememberedIdentifier,
-  saveRememberedIdentifier,
-  signInWithEmail,
-} from "@/utils/auth";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
+  const { width, height } = useWindowDimensions();
+  const router = useRouter();
+  const { successMessage } = useLocalSearchParams<{ successMessage?: string }>();
+  const [visibleSuccessMessage, setVisibleSuccessMessage] = useState<string | undefined>(
+    successMessage as string | undefined
+  );
   const passwordRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState("");
@@ -30,6 +39,12 @@ export default function Login() {
   const [error, setError] = useState("");
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+
+  useEffect(() => {
+    if (!visibleSuccessMessage) return;
+    const timer = setTimeout(() => setVisibleSuccessMessage(undefined), 10000);
+    return () => clearTimeout(timer);
+  }, [visibleSuccessMessage]);
 
   useEffect(() => {
     getRememberedIdentifier().then((saved) => {
@@ -58,6 +73,7 @@ export default function Login() {
     }
 
     await saveRememberedIdentifier(rememberMe ? email : null);
+    setLoading(false);
   }
 
   async function handleForgotPassword() {
@@ -68,21 +84,30 @@ export default function Login() {
     console.log("Forgot password pressed", email);
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.card}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.appName}>Alalay</Text>
-          </View>
-          <Text style={styles.tagline}>Your medication companion</Text>
 
+  return (
+    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
+
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <BackgroundCircle
+            posX={width * 0}
+            posY={height * -0.25}
+            blur={10}
+          />
+          <Text style={styles.authTitle}>Sign in</Text>
+
+          {!!visibleSuccessMessage && (
+            <View style={styles.successBanner} accessibilityRole="alert">
+              <Text style={styles.successText}>{visibleSuccessMessage}</Text>
+            </View>
+          )}
           {!!error && (
             <View
               style={styles.errorBanner}
@@ -93,9 +118,9 @@ export default function Login() {
             </View>
           )}
 
-          <Text style={styles.label}>Email</Text>
+          {/* <Text style={styles.label}>Email</Text> */}
           <TextInput
-            style={[styles.input, emailFocused && styles.inputFocused]}
+            style={[styles.authInput, emailFocused && styles.inputFocused]}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -107,11 +132,11 @@ export default function Login() {
             onFocus={() => setEmailFocused(true)}
             onBlur={() => setEmailFocused(false)}
             accessibilityLabel="Email"
-            placeholder="you@example.com"
+            placeholder="Email"
             placeholderTextColor="#9CA3AF"
           />
 
-          <Text style={styles.label}>Password</Text>
+          {/* <Text style={styles.label}>Password</Text> */}
           <View
             style={[
               styles.passwordRow,
@@ -131,7 +156,7 @@ export default function Login() {
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
               accessibilityLabel="Password"
-              placeholder="Min. 8 characters"
+              placeholder="Password"
               placeholderTextColor="#9CA3AF"
             />
             <Pressable
@@ -148,56 +173,32 @@ export default function Login() {
             </Pressable>
           </View>
 
-          <View style={styles.rememberRow}>
-            <Pressable
-              style={styles.rememberLeft}
-              onPress={() => setRememberMe((v) => !v)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: rememberMe }}
-            >
-              <View
-                style={[
-                  styles.checkbox,
-                  rememberMe && styles.checkboxChecked,
-                ]}
-              >
-                {rememberMe && (
-                  <Ionicons name="checkmark" size={13} color="#fff" />
-                )}
-              </View>
-              <Text style={styles.rememberText}>Remember me</Text>
-            </Pressable>
-            <Pressable
-              onPress={handleForgotPassword}
-              accessibilityRole="button"
-              accessibilityLabel="Forgot password"
-            >
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </Pressable>
-          </View>
-
           <Pressable
             style={[
-              styles.primaryButton,
-              !canSubmit && styles.primaryButtonDisabled,
+              styles.authButton,
+              !canSubmit && styles.authButtonDisabled,
             ]}
             onPress={handleSubmit}
             disabled={!canSubmit}
             accessibilityRole="button"
-            accessibilityLabel="Log in"
+            accessibilityLabel="Sign in"
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#DD00FF" />
             ) : (
-              <Text style={styles.primaryButtonText}>Log in</Text>
+              <Text style={styles.authButtonText}>Sign in</Text>
             )}
           </Pressable>
 
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          <Pressable
+            onPress={handleForgotPassword}
+            accessibilityRole="button"
+            accessibilityLabel="Forgot password"
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </Pressable>
+
+          <Text style={styles.dividerText}>Or</Text>
 
           <Pressable
             style={styles.googleButton}
@@ -205,7 +206,6 @@ export default function Login() {
             accessibilityRole="button"
             accessibilityLabel="Continue with Google"
           >
-            <Ionicons name="logo-google" size={18} color="#EA4335" />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </Pressable>
 
@@ -215,11 +215,20 @@ export default function Login() {
             accessibilityRole="button"
             accessibilityLabel="Continue with Apple"
           >
-            <Ionicons name="logo-apple" size={18} color="#fff" />
             <Text style={styles.appleButtonText}>Continue with Apple</Text>
           </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+          <Pressable
+            style={styles.signUpRow}
+            onPress={() => {
+              console.log("[NAV] login→signup press:", Date.now());
+              try { router.push("/(auth)/signup"); } catch { console.log("Sign up stub"); }
+            }}
+          >
+            <Text style={styles.signUpText}>Don't have an account? <Text style={styles.signUpTextBold}>Sign Up</Text></Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }

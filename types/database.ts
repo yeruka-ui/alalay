@@ -23,7 +23,7 @@ export type Medication = {
   original_name: string | null;
   dosage: string | null;
   instructions: string | null;
-  time: string | null;
+  time: string | null; // timetz — stored as "HH:MM:SS+08:00", display via fromDbTime()
   confidence: "low" | "medium" | "high" | null;
   is_active: boolean;
   created_at: string;
@@ -35,7 +35,7 @@ export type MedicationSchedule = {
   medication_id: number;
   user_id: string;
   scheduled_date: string;
-  scheduled_time: string | null;
+  scheduled_time: string | null; // timetz — stored as "HH:MM:SS+08:00", display via fromDbTime()
   status: "pending" | "taken" | "missed" | "skipped";
   taken_at: string | null;
   created_at: string;

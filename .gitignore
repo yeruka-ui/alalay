@@ -46,7 +46,7 @@ app-example
 # Agent, tracking, and temp files
 .agents/
 .gemini/
-CLAUDE.md
+# CLAUDE.md
 TASK.md
 skills-lock.json
 git_status.*

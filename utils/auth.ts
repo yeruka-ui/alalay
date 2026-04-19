@@ -8,6 +8,22 @@ export async function signInWithEmail(email: string, password: string) {
   return { error };
 }
 
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+  fullName: string,
+  role: string
+) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: fullName, role },
+    },
+  });
+  return { data, error };
+}
+
 export async function saveRememberedIdentifier(value: string | null) {
   if (value) {
     await AsyncStorage.setItem(REMEMBERED_KEY, value);
