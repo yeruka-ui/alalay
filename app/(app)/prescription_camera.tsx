@@ -2,6 +2,7 @@ import MedicationCard, {
   type MedicationItem,
 } from "@/components/MedicationCard";
 import { styles as sharedStyles } from "@/styles/index.styles";
+import { analyzePrescription } from "@/utils/ai";
 import { savePrescription, uploadFile } from "@/utils/database";
 import { validateMedicationName } from "@/utils/medicationValidator";
 import { Feather } from "@expo/vector-icons";
@@ -84,26 +85,6 @@ export default function PrescriptionCamera() {
     };
   }, [isLoading]);
 
-  const parseMedications = (text: string): MedicationItem[] => {
-    // Strip markdown code fences if present
-    let cleaned = text.trim();
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(cleaned);
-    const arr = Array.isArray(parsed) ? parsed : [parsed];
-
-    return arr.map((item: any, index: number) => ({
-      id: `${Date.now()}-${index}`,
-      name: item.name || "Unknown Medication",
-      instructions: item.instructions || "",
-      time: item.time || "",
-      dosage: item.dosage,
-      confidence: item.confidence || "medium",
-    }));
-  };
-
   const uploadToVLM = async (
     uri: string,
     base64Data: string,
@@ -114,52 +95,7 @@ export default function PrescriptionCamera() {
     setMedications([]);
 
     try {
-      const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-      if (!geminiKey) {
-        throw new Error(
-          "Gemini API key missing in .env (EXPO_PUBLIC_GEMINI_API_KEY)"
-        );
-      }
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    inlineData: { mimeType, data: base64Data },
-                  },
-                  {
-                    text: `Analyze this prescription image. Extract each medication into a JSON array.
-IMPORTANT: Create a SEPARATE entry for EACH time slot. If a medication is taken 3 times a day, output 3 separate objects with the same name but different times.
-Each object must have: "name" (string), "instructions" (string, e.g. "after eating"), "time" (string, e.g. "9:00 AM"), "dosage" (string, e.g. "500mg"), "confidence" (string: "low", "medium", or "high" — based on how clearly the medication text is visible in the image).
-If time is not visible, infer reasonable defaults based on frequency (e.g. once daily: "8:00 AM", twice daily: "8:00 AM" and "8:00 PM", three times daily: "8:00 AM", "1:00 PM", "8:00 PM").
-Return ONLY the JSON array, no other text.
-Example for "Paracetamol 500mg 3 times a day after eating":
-[{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","dosage":"500mg","confidence":"high"},{"name":"Paracetamol","instructions":"after eating","time":"1:00 PM","dosage":"500mg","confidence":"high"},{"name":"Paracetamol","instructions":"after eating","time":"8:00 PM","dosage":"500mg","confidence":"high"}]`,
-                  },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API request failed: ${response.status} ${errorText}`);
-      }
-
-      const result = await response.json();
-      const text =
-        result.candidates?.[0]?.content?.parts?.[0]?.text ??
-        "No text extracted.";
-
-      const items = parseMedications(text);
+      const items = await analyzePrescription(base64Data, mimeType);
       const validated = items.map((item) => ({
         ...item,
         suggestion: validateMedicationName(item.name),
@@ -167,7 +103,7 @@ Example for "Paracetamol 500mg 3 times a day after eating":
       setMedications(validated);
       setScreenPhase("results");
     } catch (error: any) {
-      console.error("VLM Error:", error);
+      console.error("[prescription_camera] analyzePrescription failed:", error?.message ?? error);
       Alert.alert("Upload Error", error.message || "Something went wrong.");
       setScreenPhase("capture");
     }

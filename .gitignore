@@ -45,7 +45,9 @@ app-example
 
 # Agent, tracking, and temp files
 .agents/
+.claude/
 .gemini/
+supabase/.temp/
 # CLAUDE.md
 TASK.md
 skills-lock.json

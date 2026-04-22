@@ -1,0 +1,7 @@
+project_id = "yrhqatpczliqdfytpvoy"
+
+[functions.analyze-prescription]
+verify_jwt = false
+
+[functions.analyze-audio]
+verify_jwt = false
