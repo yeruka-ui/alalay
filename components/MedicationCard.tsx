@@ -104,8 +104,9 @@ export default function MedicationCard({
           {item.suggestion && (
             <View style={styles.suggestionBanner}>
               <Text style={styles.suggestionText}>
-                Did you mean "
-                <Text style={styles.suggestionName}>{item.suggestion}</Text>"?
+                {"Did you mean \""}
+                <Text style={styles.suggestionName}>{item.suggestion}</Text>
+                {"\"?"}
               </Text>
               <View style={styles.suggestionActions}>
                 <TouchableOpacity
@@ -169,6 +170,7 @@ export default function MedicationCard({
               value={draft.name}
               onChangeText={(t) => setDraft({ ...draft, name: t })}
               placeholder="Medication name"
+              maxLength={200}
             />
 
             <Text style={styles.fieldLabel}>Dosage</Text>
@@ -177,6 +179,7 @@ export default function MedicationCard({
               value={draft.dosage ?? ""}
               onChangeText={(t) => setDraft({ ...draft, dosage: t })}
               placeholder="e.g. 500mg"
+              maxLength={50}
             />
 
             <Text style={styles.fieldLabel}>Instructions</Text>
@@ -185,6 +188,7 @@ export default function MedicationCard({
               value={draft.instructions}
               onChangeText={(t) => setDraft({ ...draft, instructions: t })}
               placeholder="e.g. after eating"
+              maxLength={500}
             />
 
             <Text style={styles.fieldLabel}>Time</Text>
@@ -193,6 +197,7 @@ export default function MedicationCard({
               value={draft.time}
               onChangeText={(t) => setDraft({ ...draft, time: t })}
               placeholder="e.g. 8:00 AM"
+              maxLength={50}
             />
 
             <View style={styles.popupButtons}>

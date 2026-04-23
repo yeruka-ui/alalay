@@ -383,6 +383,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.name}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, name: t })}
                     placeholder="Medication name"
+                    maxLength={200}
                   />
 
                   <Text style={styles.modalLabel}>Dosage</Text>
@@ -391,6 +392,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.dosage}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, dosage: t })}
                     placeholder="e.g. 500mg"
+                    maxLength={50}
                   />
 
                   <Text style={styles.modalLabel}>Instructions</Text>
@@ -399,6 +401,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.instructions}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, instructions: t })}
                     placeholder="e.g. after eating"
+                    maxLength={500}
                   />
 
                   <Text style={styles.modalLabel}>Time</Text>
@@ -407,6 +410,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.time}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, time: t })}
                     placeholder="e.g. 8:00 AM"
+                    maxLength={50}
                   />
 
                   <View style={styles.modalButtons}>

@@ -24,6 +24,7 @@ import {
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
   const scrollViewRef = useRef<ScrollView>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -41,9 +42,11 @@ export default function Dashboard() {
   const [schedules, setSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
   const [allMedications, setAllMedications] = useState<Medication[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoadingData(true);
+    setFetchError(null);
     try {
       const [schedulesData, medsData] = await Promise.all([
         getSchedulesForDate(selectedDate),
@@ -51,8 +54,16 @@ export default function Dashboard() {
       ]);
       setSchedules(schedulesData);
       setAllMedications(medsData);
-    } catch {
-      // Silently fail — user may not be logged in yet
+    } catch (err) {
+      const isAuthError =
+        err instanceof Error &&
+        (err.message.includes("Not authenticated") ||
+          err.message.includes("JWT"));
+      setFetchError(
+        isAuthError
+          ? "Your session expired. Please log in again."
+          : "Could not load data. Pull to retry."
+      );
     } finally {
       setIsLoadingData(false);
     }
@@ -175,10 +186,13 @@ export default function Dashboard() {
         date.getFullYear() === selectedDate.getFullYear(),
     );
 
-    setTimeout(
+    scrollTimeoutRef.current = setTimeout(
       () => scrollToDate(selectedIndex !== -1 ? selectedIndex : 0),
       100,
     );
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
   }, [selectedDate]);
 
   return (
@@ -259,6 +273,13 @@ export default function Dashboard() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
+
+        {/* Error banner */}
+        {!!fetchError && (
+          <View style={styles.fetchErrorBanner}>
+            <Text style={styles.fetchErrorText}>{fetchError}</Text>
+          </View>
+        )}
 
         {/* Medication Schedule List */}
         {isLoadingData ? (

@@ -118,6 +118,20 @@ export const styles = StyleSheet.create({
     color: "#B902D6",
   },
 
+  fetchErrorBanner: {
+    backgroundColor: "#FFF5F5",
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#D32F2F",
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  fetchErrorText: {
+    color: "#D32F2F",
+    fontSize: 14,
+  },
+
   //************************* record locker styles ****************************//
   topPanel: {
     backgroundColor: "#BE01DC",

@@ -5,6 +5,7 @@ import {
   saveRememberedIdentifier,
   signInWithEmail,
 } from "@/utils/auth";
+import { supabase } from "@/utils/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -37,6 +38,8 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [forgotInfo, setForgotInfo] = useState<string | null>(null);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
@@ -77,11 +80,23 @@ export default function Login() {
   }
 
   async function handleForgotPassword() {
-    const { supabase } = await import("@/utils/supabase");
-    if (email) {
-      await supabase.auth.resetPasswordForEmail(email);
+    setForgotInfo(null);
+    setError("");
+    if (!EMAIL_REGEX.test(email)) {
+      setError("Enter a valid email before requesting a reset.");
+      return;
     }
-    console.log("Forgot password pressed", email);
+    setForgotLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email,
+      { redirectTo: "alalay://auth/reset-password" }
+    );
+    setForgotLoading(false);
+    if (resetError) {
+      setError("Could not send reset email. Try again later.");
+      return;
+    }
+    setForgotInfo("Password reset email sent. Check your inbox.");
   }
 
 
@@ -107,6 +122,11 @@ export default function Login() {
           {!!visibleSuccessMessage && (
             <View style={styles.successBanner} accessibilityRole="alert">
               <Text style={styles.successText}>{visibleSuccessMessage}</Text>
+            </View>
+          )}
+          {!!forgotInfo && (
+            <View style={styles.successBanner} accessibilityRole="alert">
+              <Text style={styles.successText}>{forgotInfo}</Text>
             </View>
           )}
           {!!error && (
@@ -193,10 +213,13 @@ export default function Login() {
 
           <Pressable
             onPress={handleForgotPassword}
+            disabled={forgotLoading}
             accessibilityRole="button"
             accessibilityLabel="Forgot password"
           >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
+            <Text style={[styles.forgotText, forgotLoading && { opacity: 0.5 }]}>
+              {forgotLoading ? "Sending…" : "Forgot Password?"}
+            </Text>
           </Pressable>
 
           <Text style={styles.dividerText}>Or</Text>
@@ -226,7 +249,7 @@ export default function Login() {
               try { router.push("/(auth)/signup"); } catch { console.log("Sign up stub"); }
             }}
           >
-            <Text style={styles.signUpText}>Don't have an account? <Text style={styles.signUpTextBold}>Sign Up</Text></Text>
+            <Text style={styles.signUpText}>{"Don't have an account? "}<Text style={styles.signUpTextBold}>Sign Up</Text></Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

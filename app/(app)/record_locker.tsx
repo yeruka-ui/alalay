@@ -33,6 +33,7 @@ export default function RecordLocker() {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const fabAnimation = useRef(new Animated.Value(0)).current;
 
   const tabToRecordType: Record<string, string | undefined> = {
@@ -44,11 +45,20 @@ export default function RecordLocker() {
 
   const fetchRecords = useCallback(async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const data = await getMedicalRecords(tabToRecordType[activeTab]);
       setRecords(data);
-    } catch {
-      // User may not be logged in
+    } catch (err) {
+      const isAuthError =
+        err instanceof Error &&
+        (err.message.includes("Not authenticated") ||
+          err.message.includes("JWT"));
+      setFetchError(
+        isAuthError
+          ? "Your session expired. Please log in again."
+          : "Could not load data. Pull to retry."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -164,6 +174,13 @@ export default function RecordLocker() {
             />
           </View>
         </View>
+        {/* Error banner */}
+        {!!fetchError && (
+          <View style={styles.fetchErrorBanner}>
+            <Text style={styles.fetchErrorText}>{fetchError}</Text>
+          </View>
+        )}
+
         {/* Records List */}
         {isLoading ? (
           <View
