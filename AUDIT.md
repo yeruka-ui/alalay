@@ -20,6 +20,16 @@
 
 ## Recent Changes
 
+### 2026-04-23 — SEC-02 / T-003 (Storage path-in-DB, sign-on-read)
+
+✅ **SEC-02 / T-003 fixed:** `uploadFile()` no longer calls `getPublicUrl()` or stores signed URLs in the DB.  
+✅ **Schema:** `prescriptions.image_url → image_path`, `medical_records.file_url → file_path` (migration section 10).  
+✅ **Helper added:** `getSignedUrlFor(bucket, path, expiresIn=300)` in `utils/database.ts` for short-lived read URLs.  
+✅ **Data cleanup:** Existing `http%` values nulled via migration UPDATE — no broken URLs in DB.  
+✅ **Types updated:** `types/database.ts` fields renamed to match new column names.
+
+---
+
 ### 2026-04-22 — ES256 JWT Auth Fix (Edge Function Gateway Compatibility)
 
 ✅ **Issue:** Edge Functions gateway rejected ES256-signed tokens with 401 `UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM`.  
@@ -106,19 +116,9 @@ Key moved to `supabase secrets`. Client uses `supabase.functions.invoke` with JW
 
 ---
 
-### SEC-02 — Storage: Private Buckets + `getPublicUrl()` = Broken + Misleading
-**CVSS: 5.3 (Medium)**
+### ~~SEC-02~~ — Storage: Private Buckets + `getPublicUrl()` = Broken + Misleading ✅ Fixed 2026-04-23 (T-003)
 
-Both storage buckets are created with `public: false` in the migration, but `uploadFile()` returns `getPublicUrl()` which generates a URL only valid for public buckets.
-
-```ts
-// utils/database.ts:204
-const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-return data.publicUrl; // ← returns a 400 for private buckets
-```
-
-**Result:** Images are uploaded successfully but the returned URL is non-functional. Every `image_url` stored in the `prescriptions` table points to a broken link.  
-**Fix:** Replace `getPublicUrl()` with `createSignedUrl()` for reads, or set buckets to public.
+`uploadFile()` now returns the storage object path. Columns renamed: `prescriptions.image_url → image_path`, `medical_records.file_url → file_path`. `getSignedUrlFor(bucket, path)` added for 5-min signed URLs at read time. Existing broken URLs nulled via migration section 10.
 
 ---
 

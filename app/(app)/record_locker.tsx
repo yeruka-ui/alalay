@@ -68,8 +68,8 @@ export default function RecordLocker() {
       | "other" = "other",
   ) => {
     try {
-      const fileUrl = await uploadFile("medical-records", uri, fileName);
-      await saveMedicalRecord(recordType, fileUrl, fileName);
+      const filePath = await uploadFile("medical-records", uri, fileName);
+      await saveMedicalRecord(recordType, filePath, fileName);
       Alert.alert("Saved!", "Record has been added.");
       fetchRecords();
     } catch (error: any) {

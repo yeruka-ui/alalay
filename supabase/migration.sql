@@ -182,3 +182,14 @@ alter table public.medications add column time timetz;
 
 alter table public.medication_schedules drop column if exists scheduled_time;
 alter table public.medication_schedules add column scheduled_time timetz;
+
+-- ============================================================
+-- 10. SEC-02 — Rename storage URL columns to storage path columns
+-- Buckets are private; app stores paths and signs on demand.
+-- ============================================================
+alter table public.prescriptions rename column image_url to image_path;
+alter table public.medical_records rename column file_url to file_path;
+
+-- Null broken getPublicUrl/signed-URL values written before SEC-02 fix
+update public.prescriptions set image_path = null where image_path like 'http%';
+update public.medical_records set file_path = null where file_path like 'http%';

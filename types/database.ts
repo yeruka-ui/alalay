@@ -9,7 +9,7 @@ export type Profile = {
 export type Prescription = {
   id: number;
   user_id: string;
-  image_url: string | null;
+  image_path: string | null;
   raw_ocr_text: string | null;
   source: "camera" | "gallery" | "manual";
   created_at: string;
@@ -46,7 +46,7 @@ export type MedicalRecord = {
   user_id: string;
   record_type: "prescription" | "lab_result" | "medical_id" | "other";
   title: string | null;
-  file_url: string | null;
+  file_path: string | null;
   notes: string | null;
   created_at: string;
 };

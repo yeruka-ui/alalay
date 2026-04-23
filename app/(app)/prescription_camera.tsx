@@ -205,16 +205,16 @@ export default function PrescriptionCamera() {
     setIsSaving(true);
     try {
       // Upload prescription image if available
-      let uploadedImageUrl: string | undefined;
+      let uploadedImagePath: string | undefined;
       if (imageUri) {
         try {
-          uploadedImageUrl = await uploadFile("prescriptions", imageUri, "prescription.jpg");
+          uploadedImagePath = await uploadFile("prescriptions", imageUri, "prescription.jpg");
         } catch {
           // Continue without image upload — medications still get saved
         }
       }
 
-      await savePrescription(medications, uploadedImageUrl, undefined, "camera", startDate);
+      await savePrescription(medications, uploadedImagePath, undefined, "camera", startDate);
 
       Alert.alert("Added!", "Your medications have been saved to Alalay.", [
         { text: "OK", onPress: () => router.navigate("/dashboard") },

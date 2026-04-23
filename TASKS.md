@@ -27,10 +27,13 @@
 
 ---
 
-### [T-003] Fix: Storage returns broken URLs for private buckets
-**File:** `utils/database.ts:204`  
-**Description:** `getPublicUrl()` is called on buckets marked `public: false`. The returned URL 400s. All `image_url` values in the DB are non-functional.  
-**Success criteria:** Replace `getPublicUrl()` with `createSignedUrl(filePath, 3600)` in `uploadFile()`. Update the return type to handle async. Update all callers. Verify prescription images render in the UI.
+### [x] [T-003] Fix: Storage returns broken URLs for private buckets
+**Fixed 2026-04-23**  
+- `uploadFile()` now returns the storage path (e.g. `{uid}/{ts}-{name}`) instead of a signed URL.  
+- `prescriptions.image_url` → `image_path`; `medical_records.file_url` → `file_path` (migration section 10).  
+- `getSignedUrlFor(bucket, path, expiresIn=300)` added to `utils/database.ts` for on-demand 5-min signed URLs at read time.  
+- Existing broken `http%` values nulled via migration UPDATE.  
+- Types in `types/database.ts` updated to match renamed columns.
 
 ---
 
