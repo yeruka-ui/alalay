@@ -6,8 +6,9 @@ import type { Medication, MedicationSchedule } from "@/types/database";
 import {
   DAY_BATCH_SIZE,
   createDateBatch,
+  getCalendarSelectionTransitionOffset,
   getBatchStartForOffset,
-  getCenteredBatchStart,
+  getSelectedDateBatchState,
   isSameDay,
   startOfDay,
 } from "@/utils/dashboardCalendar";
@@ -21,6 +22,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Modal,
   Platform,
   ScrollView,
@@ -35,18 +38,22 @@ const CALENDAR_GAP = 8;
 const ACTIVE_WIDTH_BONUS = 28;
 const PAGE_BUFFER = 120;
 const CENTER_PAGE_INDEX = PAGE_BUFFER;
+const DAY_BATCH_CENTER_INDEX = Math.floor(DAY_BATCH_SIZE / 2);
+const CALENDAR_RECENTER_ANIMATION_MS = 180;
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
   const initialSelectedDate = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
   const [batchAnchorStart, setBatchAnchorStart] = useState(() =>
-    getCenteredBatchStart(initialSelectedDate),
+    getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
   const carouselRef = useRef<ICarouselInstance>(null);
   const shouldResetCarouselRef = useRef(false);
+  const pendingTransitionOffsetRef = useRef(0);
+  const calendarTranslateX = useRef(new Animated.Value(0)).current;
   const pageOffsets = useMemo(
     () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
     [],
@@ -148,11 +155,33 @@ export default function Dashboard() {
     return `${hour12}:${m} ${ampm}`;
   };
 
-  const handleSelectedDateChange = (date: Date) => {
-    const normalizedDate = startOfDay(date);
-    setSelectedDate(normalizedDate);
+  const handleSelectedDateChange = (date: Date, transitionOffset: number = 0) => {
+    const nextSelectionState = getSelectedDateBatchState(date);
+
+    pendingTransitionOffsetRef.current = transitionOffset;
+    setSelectedDate(nextSelectionState.selectedDate);
     shouldResetCarouselRef.current = true;
-    setBatchAnchorStart(getCenteredBatchStart(normalizedDate));
+    setBatchAnchorStart(nextSelectionState.batchAnchorStart);
+  };
+
+  const handleDayPress = (
+    date: Date,
+    pressedIndex: number,
+    pageDates: Date[],
+  ) => {
+    const currentSelectedIndex = pageDates.findIndex((pageDate) =>
+      isSameDay(pageDate, selectedDate),
+    );
+    const transitionOffset = getCalendarSelectionTransitionOffset({
+      pressedIndex,
+      currentSelectedIndex: currentSelectedIndex >= 0 ? currentSelectedIndex : null,
+      nextSelectedIndex: DAY_BATCH_CENTER_INDEX,
+      activeCardWidth,
+      inactiveCardWidth,
+      gap: CALENDAR_GAP,
+    });
+
+    handleSelectedDateChange(date, transitionOffset);
   };
 
   useEffect(() => {
@@ -161,8 +190,24 @@ export default function Dashboard() {
     }
 
     carouselRef.current?.scrollTo({ index: CENTER_PAGE_INDEX, animated: false });
+    calendarTranslateX.stopAnimation();
+
+    const transitionOffset = pendingTransitionOffsetRef.current;
+    if (transitionOffset !== 0) {
+      calendarTranslateX.setValue(transitionOffset);
+      Animated.timing(calendarTranslateX, {
+        toValue: 0,
+        duration: CALENDAR_RECENTER_ANIMATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      calendarTranslateX.setValue(0);
+    }
+
+    pendingTransitionOffsetRef.current = 0;
     shouldResetCarouselRef.current = false;
-  }, [batchAnchorStart]);
+  }, [batchAnchorStart, calendarTranslateX]);
 
   const calendarWidth = Math.max(screenWidth - CALENDAR_PADDING, 260);
   const inactiveCardWidth = Math.floor(
@@ -214,8 +259,13 @@ export default function Dashboard() {
                 const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
 
                 return (
-                  <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
-                    {pageDates.map((date) => {
+                  <Animated.View
+                    style={{
+                      transform: [{ translateX: calendarTranslateX }],
+                    }}
+                  >
+                    <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
+                    {pageDates.map((date, index) => {
                       const isSelected = isSameDay(date, selectedDate);
 
                       return (
@@ -225,7 +275,7 @@ export default function Dashboard() {
                             isSelected ? styles.activeCard : styles.inactiveCard,
                             { width: isSelected ? activeCardWidth : inactiveCardWidth },
                           ]}
-                          onPress={() => setSelectedDate(date)}
+                          onPress={() => handleDayPress(date, index, pageDates)}
                         >
                           <Text
                             style={
@@ -248,7 +298,8 @@ export default function Dashboard() {
                         </TouchableOpacity>
                       );
                     })}
-                  </View>
+                    </View>
+                  </Animated.View>
                 );
               }}
             />

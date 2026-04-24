@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   DAY_BATCH_SIZE,
   createDateBatch,
+  getCalendarSelectionTransitionOffset,
   getBatchStartForOffset,
+  getSelectedDateBatchState,
   getCenteredBatchStart,
   isSameDay,
   shiftBatchStart,
@@ -50,4 +52,43 @@ test("getBatchStartForOffset derives stable previous and next batch starts from 
   assert.ok(isSameDay(getBatchStartForOffset(anchorStart, -1), new Date(2026, 3, 17)));
   assert.ok(isSameDay(getBatchStartForOffset(anchorStart, 0), new Date(2026, 3, 22)));
   assert.ok(isSameDay(getBatchStartForOffset(anchorStart, 1), new Date(2026, 3, 27)));
+});
+
+test("getSelectedDateBatchState recenters an edge selection into the middle slot", () => {
+  const edgeDate = new Date(2026, 3, 26);
+  const selectionState = getSelectedDateBatchState(edgeDate);
+  const batch = createDateBatch(selectionState.batchAnchorStart);
+
+  assert.ok(isSameDay(selectionState.selectedDate, edgeDate));
+  assert.ok(isSameDay(selectionState.batchAnchorStart, new Date(2026, 3, 24)));
+  assert.equal(batch.length, DAY_BATCH_SIZE);
+  assert.ok(isSameDay(batch[2]!, edgeDate));
+  assert.ok(isSameDay(batch[0]!, new Date(2026, 3, 24)));
+  assert.ok(isSameDay(batch[4]!, new Date(2026, 3, 28)));
+});
+
+test("getCalendarSelectionTransitionOffset moves a right-edge tap left toward center", () => {
+  const transitionOffset = getCalendarSelectionTransitionOffset({
+    pressedIndex: 4,
+    currentSelectedIndex: 2,
+    nextSelectedIndex: 2,
+    activeCardWidth: 78,
+    inactiveCardWidth: 50,
+    gap: 8,
+  });
+
+  assert.equal(transitionOffset, 130);
+});
+
+test("getCalendarSelectionTransitionOffset moves a left-edge tap right toward center", () => {
+  const transitionOffset = getCalendarSelectionTransitionOffset({
+    pressedIndex: 0,
+    currentSelectedIndex: 2,
+    nextSelectedIndex: 2,
+    activeCardWidth: 78,
+    inactiveCardWidth: 50,
+    gap: 8,
+  });
+
+  assert.equal(transitionOffset, -130);
 });
