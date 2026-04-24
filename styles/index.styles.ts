@@ -47,7 +47,11 @@ export const styles = StyleSheet.create({
   dateCarousel: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 10,
+  },
+  dateCarouselContainer: {
+    alignSelf: "center",
   },
   activeCard: {
     backgroundColor: "#B902D6",

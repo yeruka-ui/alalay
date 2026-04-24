@@ -3,30 +3,54 @@ import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
 import type { Medication, MedicationSchedule } from "@/types/database";
+import {
+  DAY_BATCH_SIZE,
+  createDateBatch,
+  getBatchStartForOffset,
+  getCenteredBatchStart,
+  isSameDay,
+  startOfDay,
+} from "@/utils/dashboardCalendar";
 import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { Stack } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
 import {
   ActivityIndicator,
-  Dimensions,
   Modal,
   Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
+
+const CALENDAR_PADDING = 60;
+const CALENDAR_GAP = 8;
+const ACTIVE_WIDTH_BONUS = 28;
+const PAGE_BUFFER = 120;
+const CENTER_PAGE_INDEX = PAGE_BUFFER;
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
-  const scrollViewRef = useRef<ScrollView>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const initialSelectedDate = startOfDay(new Date());
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const [batchAnchorStart, setBatchAnchorStart] = useState(() =>
+    getCenteredBatchStart(initialSelectedDate),
+  );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+  const carouselRef = useRef<ICarouselInstance>(null);
+  const shouldResetCarouselRef = useRef(false);
+  const pageOffsets = useMemo(
+    () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
+    [],
+  );
 
   // **************************** TAB FILTER LOGIC ****************************
   // Variable to track active and inactive tabs
@@ -115,28 +139,6 @@ export default function Dashboard() {
     return short ? daysShort[dayIndex] : daysLong[dayIndex];
   };
 
-  const generateDates = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const dates = [];
-
-    // Add 2 days from previous month for padding
-    dates.push(new Date(year, month, -1)); // second-to-last day of previous month
-    dates.push(new Date(year, month, 0)); // last day of previous month
-
-    // Add all days of current month
-    const lastDay = new Date(year, month + 1, 0);
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      dates.push(new Date(year, month, day));
-    }
-
-    // Add 2 days from next month for padding
-    dates.push(new Date(year, month + 1, 1));
-    dates.push(new Date(year, month + 1, 2));
-
-    return dates;
-  };
-
   const formatTime = (t: string | null) => {
     if (!t) return "No time set";
     const [h, m] = t.split(":");
@@ -146,54 +148,28 @@ export default function Dashboard() {
     return `${hour12}:${m} ${ampm}`;
   };
 
-  const dates = generateDates(selectedDate);
-
-  // Card dimensions from styles
-  const CARD_WIDTH = 50;
-  const ACTIVE_CARD_WIDTH = 90;
-  const GAP = 10;
-
-  const scrollToDate = (index: number) => {
-    const screenWidth = Dimensions.get("window").width;
-    // Account for container (10) + purplePanel (20) padding on both sides
-    const totalHorizontalPadding = (10 + 20) * 2;
-    const visibleWidth = screenWidth - totalHorizontalPadding;
-
-    let scrollPosition = 0;
-
-    // Calculate cumulative width up to this card
-    for (let i = 0; i < index; i++) {
-      scrollPosition += CARD_WIDTH + GAP;
-    }
-
-    // Add half of the active card to get to its center
-    scrollPosition += ACTIVE_CARD_WIDTH / 2;
-
-    // Subtract half of visible width to center the card
-    scrollPosition -= visibleWidth / 2;
-
-    scrollViewRef.current?.scrollTo({
-      x: scrollPosition,
-      animated: true,
-    });
+  const handleSelectedDateChange = (date: Date) => {
+    const normalizedDate = startOfDay(date);
+    setSelectedDate(normalizedDate);
+    shouldResetCarouselRef.current = true;
+    setBatchAnchorStart(getCenteredBatchStart(normalizedDate));
   };
 
   useEffect(() => {
-    const selectedIndex = dates.findIndex(
-      (date) =>
-        date.getDate() === selectedDate.getDate() &&
-        date.getMonth() === selectedDate.getMonth() &&
-        date.getFullYear() === selectedDate.getFullYear(),
-    );
+    if (!shouldResetCarouselRef.current) {
+      return;
+    }
 
-    scrollTimeoutRef.current = setTimeout(
-      () => scrollToDate(selectedIndex !== -1 ? selectedIndex : 0),
-      100,
-    );
-    return () => {
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-  }, [selectedDate]);
+    carouselRef.current?.scrollTo({ index: CENTER_PAGE_INDEX, animated: false });
+    shouldResetCarouselRef.current = false;
+  }, [batchAnchorStart]);
+
+  const calendarWidth = Math.max(screenWidth - CALENDAR_PADDING, 260);
+  const inactiveCardWidth = Math.floor(
+    (calendarWidth - CALENDAR_GAP * (DAY_BATCH_SIZE - 1) - ACTIVE_WIDTH_BONUS) /
+      DAY_BATCH_SIZE,
+  );
+  const activeCardWidth = inactiveCardWidth + ACTIVE_WIDTH_BONUS;
 
   return (
     <>
@@ -208,7 +184,7 @@ export default function Dashboard() {
                     {getMonthName(selectedDate.getMonth())}{" "}
                     {selectedDate.getFullYear()}
                   </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
+                  <Text style={styles.dropdownArrow}>v</Text>
                 </View>
               </TouchableOpacity>
 
@@ -223,49 +199,59 @@ export default function Dashboard() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dateCarousel}
-            >
-              {dates.map((date, index) => {
-                const isSelected =
-                  date.getDate() === selectedDate.getDate() &&
-                  date.getMonth() === selectedDate.getMonth() &&
-                  date.getFullYear() === selectedDate.getFullYear();
+            <Carousel
+              ref={carouselRef}
+              data={pageOffsets}
+              defaultIndex={CENTER_PAGE_INDEX}
+              height={160}
+              loop={false}
+              overscrollEnabled={false}
+              pagingEnabled
+              style={styles.dateCarouselContainer}
+              width={calendarWidth}
+              windowSize={5}
+              renderItem={({ item }) => {
+                const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
 
                 return (
-                  <TouchableOpacity
-                    key={date.toISOString()}
-                    style={isSelected ? styles.activeCard : styles.inactiveCard}
-                    onPress={() => {
-                      setSelectedDate(new Date(date));
-                      scrollToDate(index);
-                    }}
-                  >
-                    <Text
-                      style={
-                        isSelected
-                          ? styles.dateNumberActive
-                          : styles.dateNumberInactive
-                      }
-                    >
-                      {date.getDate()}
-                    </Text>
-                    <Text
-                      style={
-                        isSelected
-                          ? styles.dayNameActive
-                          : styles.dayNameInactive
-                      }
-                    >
-                      {getDayName(date.getDay(), !isSelected)}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
+                    {pageDates.map((date) => {
+                      const isSelected = isSameDay(date, selectedDate);
+
+                      return (
+                        <TouchableOpacity
+                          key={date.toISOString()}
+                          style={[
+                            isSelected ? styles.activeCard : styles.inactiveCard,
+                            { width: isSelected ? activeCardWidth : inactiveCardWidth },
+                          ]}
+                          onPress={() => setSelectedDate(date)}
+                        >
+                          <Text
+                            style={
+                              isSelected
+                                ? styles.dateNumberActive
+                                : styles.dateNumberInactive
+                            }
+                          >
+                            {date.getDate()}
+                          </Text>
+                          <Text
+                            style={
+                              isSelected
+                                ? styles.dayNameActive
+                                : styles.dayNameInactive
+                            }
+                          >
+                            {getDayName(date.getDay(), !isSelected)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 );
-              })}
-            </ScrollView>
+              }}
+            />
           </View>
         </View>
         <TabFilterBar
@@ -351,14 +337,14 @@ export default function Dashboard() {
               mode="date"
               display="spinner"
               onChange={(_: DateTimePickerEvent, date?: Date) => {
-                if (date) setSelectedDate(date);
+                if (date) handleSelectedDateChange(date);
               }}
             />
           </View>
         </Modal>
       )}
 
-      {/* Android: native calendar dialog — auto-dismisses on selection or cancel */}
+      {/* Android: native calendar dialog - auto-dismisses on selection or cancel */}
       {Platform.OS === "android" && isDropdownOpen && (
         <DateTimePicker
           value={selectedDate}
@@ -366,7 +352,7 @@ export default function Dashboard() {
           display="default"
           onChange={(event: DateTimePickerEvent, date?: Date) => {
             setIsDropdownOpen(false);
-            if (event.type !== "dismissed" && date) setSelectedDate(date);
+            if (event.type !== "dismissed" && date) handleSelectedDateChange(date);
           }}
         />
       )}
