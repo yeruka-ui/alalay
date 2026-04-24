@@ -27,10 +27,13 @@
 
 ---
 
-### [T-003] Fix: Storage returns broken URLs for private buckets
-**File:** `utils/database.ts:204`  
-**Description:** `getPublicUrl()` is called on buckets marked `public: false`. The returned URL 400s. All `image_url` values in the DB are non-functional.  
-**Success criteria:** Replace `getPublicUrl()` with `createSignedUrl(filePath, 3600)` in `uploadFile()`. Update the return type to handle async. Update all callers. Verify prescription images render in the UI.
+### [x] [T-003] Fix: Storage returns broken URLs for private buckets
+**Fixed 2026-04-23**  
+- `uploadFile()` now returns the storage path (e.g. `{uid}/{ts}-{name}`) instead of a signed URL.  
+- `prescriptions.image_url` → `image_path`; `medical_records.file_url` → `file_path` (migration section 10).  
+- `getSignedUrlFor(bucket, path, expiresIn=300)` added to `utils/database.ts` for on-demand 5-min signed URLs at read time.  
+- Existing broken `http%` values nulled via migration UPDATE.  
+- Types in `types/database.ts` updated to match renamed columns.
 
 ---
 
@@ -64,7 +67,7 @@
 
 ## P1 — High Priority
 
-### [T-006] Fix: Silent authentication failures across all screens
+### [x] [T-006] Fix: Silent authentication failures across all screens
 **Files:** `app/(app)/dashboard.tsx:52`, `app/(app)/record_locker.tsx:48`  
 **Description:** `catch {}` swallows "Not authenticated" errors and displays empty state as if no data exists.  
 **Success criteria:** Distinguish auth errors (show "Session expired, please re-log in") from data-empty (show "No items") from other errors.
@@ -76,27 +79,27 @@
 
 ---
 
-### [T-008] Fix: Add React error boundaries
+### [x] [T-008] Fix: Add React error boundaries
 **Files:** `app/_layout.tsx` or individual screen wrappers  
 **Description:** A crash in any screen propagates to a white screen with no recovery.  
 **Success criteria:** Wrap each screen (or the Stack) in an error boundary that shows a friendly error message with a "Try again" button.
 
 ---
 
-### [T-009] Fix: `setTimeout` without cleanup in dashboard
+### [x] [T-009] Fix: `setTimeout` without cleanup in dashboard
 **File:** `app/dashboard.tsx:167`  
 **Description:** `setTimeout` fires after `selectedDate` changes with no cleanup on fast changes or unmount.  
 **Success criteria:** Store timeout ID in `useRef`; clear it in the `useEffect` return cleanup function.
 
 ---
 
-### [T-010] Add: `with check` clauses to all RLS policies
+### [x] [T-010] Add: `with check` clauses to all RLS policies
 **File:** `supabase/migration.sql` — requires a new migration  
 **Success criteria:** New migration adds `with check (user_id = auth.uid())` to all five table policies.
 
 ---
 
-### [T-011] Add: `maxLength` to all TextInput fields
+### [x] [T-011] Add: `maxLength` to all TextInput fields
 **Files:** `components/MedicationCard.tsx:153–180`, `app/prescription_camera.tsx:393–420`  
 **Success criteria:** Name ≤ 200, dosage/time ≤ 50, instructions ≤ 500, notes ≤ 1000.
 
@@ -112,7 +115,7 @@
 
 ---
 
-### [T-034] Fix: Forgot-password has no UX, logs PII
+### [x] [T-034] Fix: Forgot-password has no UX, logs PII
 **File:** `app/(auth)/login.tsx:67-73`  
 **Description:** No email validation, no `redirectTo`, no success/error UI, logs the email to console.  
 **Success criteria:**  

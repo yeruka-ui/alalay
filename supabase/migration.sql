@@ -182,3 +182,48 @@ alter table public.medications add column time timetz;
 
 alter table public.medication_schedules drop column if exists scheduled_time;
 alter table public.medication_schedules add column scheduled_time timetz;
+
+-- ============================================================
+-- 10. SEC-02 — Rename storage URL columns to storage path columns
+-- Buckets are private; app stores paths and signs on demand.
+-- ============================================================
+alter table public.prescriptions rename column image_url to image_path;
+alter table public.medical_records rename column file_url to file_path;
+
+-- Null broken getPublicUrl/signed-URL values written before SEC-02 fix
+update public.prescriptions set image_path = null where image_path like 'http%';
+update public.medical_records set file_path = null where file_path like 'http%';
+
+-- ============================================================
+-- 11. SEC-03 — Add WITH CHECK clauses to all RLS policies
+-- Prevents users from INSERTing/UPDATEing rows owned by another user.
+-- ============================================================
+drop policy if exists profiles_policy on public.profiles;
+create policy profiles_policy on public.profiles
+  for all to authenticated
+  using (auth_id = auth.uid())
+  with check (auth_id = auth.uid());
+
+drop policy if exists prescriptions_policy on public.prescriptions;
+create policy prescriptions_policy on public.prescriptions
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists medications_policy on public.medications;
+create policy medications_policy on public.medications
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists schedules_policy on public.medication_schedules;
+create policy schedules_policy on public.medication_schedules
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists medical_records_policy on public.medical_records;
+create policy medical_records_policy on public.medical_records
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());

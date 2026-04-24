@@ -1,8 +1,11 @@
+import { AppErrorBoundary } from "@/components/ErrorBoundary";
 import { supabase } from "@/utils/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+export { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -30,7 +33,9 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Slot />
+      <AppErrorBoundary>
+        <Slot />
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }

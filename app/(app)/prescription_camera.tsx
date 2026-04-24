@@ -205,16 +205,16 @@ export default function PrescriptionCamera() {
     setIsSaving(true);
     try {
       // Upload prescription image if available
-      let uploadedImageUrl: string | undefined;
+      let uploadedImagePath: string | undefined;
       if (imageUri) {
         try {
-          uploadedImageUrl = await uploadFile("prescriptions", imageUri, "prescription.jpg");
+          uploadedImagePath = await uploadFile("prescriptions", imageUri, "prescription.jpg");
         } catch {
           // Continue without image upload — medications still get saved
         }
       }
 
-      await savePrescription(medications, uploadedImageUrl, undefined, "camera", startDate);
+      await savePrescription(medications, uploadedImagePath, undefined, "camera", startDate);
 
       Alert.alert("Added!", "Your medications have been saved to Alalay.", [
         { text: "OK", onPress: () => router.navigate("/dashboard") },
@@ -383,6 +383,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.name}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, name: t })}
                     placeholder="Medication name"
+                    maxLength={200}
                   />
 
                   <Text style={styles.modalLabel}>Dosage</Text>
@@ -391,6 +392,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.dosage}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, dosage: t })}
                     placeholder="e.g. 500mg"
+                    maxLength={50}
                   />
 
                   <Text style={styles.modalLabel}>Instructions</Text>
@@ -399,6 +401,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.instructions}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, instructions: t })}
                     placeholder="e.g. after eating"
+                    maxLength={500}
                   />
 
                   <Text style={styles.modalLabel}>Time</Text>
@@ -407,6 +410,7 @@ export default function PrescriptionCamera() {
                     value={manualDraft.time}
                     onChangeText={(t) => setManualDraft({ ...manualDraft, time: t })}
                     placeholder="e.g. 8:00 AM"
+                    maxLength={50}
                   />
 
                   <View style={styles.modalButtons}>

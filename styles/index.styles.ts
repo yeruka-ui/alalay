@@ -47,7 +47,11 @@ export const styles = StyleSheet.create({
   dateCarousel: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 10,
+  },
+  dateCarouselContainer: {
+    alignSelf: "center",
   },
   activeCard: {
     backgroundColor: "#B902D6",
@@ -116,6 +120,20 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#B902D6",
+  },
+
+  fetchErrorBanner: {
+    backgroundColor: "#FFF5F5",
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#D32F2F",
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  fetchErrorText: {
+    color: "#D32F2F",
+    fontSize: 14,
   },
 
   //************************* record locker styles ****************************//

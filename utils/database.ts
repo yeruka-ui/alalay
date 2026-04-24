@@ -22,7 +22,7 @@ export async function getCurrentUserId(): Promise<string> {
 
 export async function savePrescription(
   medications: MedicationItem[],
-  imageUrl?: string,
+  imagePath?: string,
   rawOcrText?: string,
   source: "camera" | "gallery" | "manual" = "camera",
   startDate: Date = new Date()
@@ -32,7 +32,7 @@ export async function savePrescription(
   // Insert prescription
   const { data: prescription, error: rxError } = await supabase
     .from("prescriptions")
-    .insert({ user_id: userId, image_url: imageUrl, raw_ocr_text: rawOcrText, source })
+    .insert({ user_id: userId, image_path: imagePath, raw_ocr_text: rawOcrText, source })
     .select()
     .single();
 
@@ -148,7 +148,7 @@ export async function createSchedulesForMedication(
 
 export async function saveMedicalRecord(
   recordType: "prescription" | "lab_result" | "medical_id" | "other",
-  fileUrl: string,
+  filePath: string,
   title?: string,
   notes?: string
 ): Promise<MedicalRecord> {
@@ -159,7 +159,7 @@ export async function saveMedicalRecord(
     .insert({
       user_id: userId,
       record_type: recordType,
-      file_url: fileUrl,
+      file_path: filePath,
       title: title ?? null,
       notes: notes ?? null,
     })
@@ -208,7 +208,17 @@ export async function uploadFile(
     .upload(filePath, blob, { contentType: blob.type });
 
   if (error) throw error;
+  return filePath;
+}
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-  return data.publicUrl;
+export async function getSignedUrlFor(
+  bucket: "prescriptions" | "medical-records",
+  path: string,
+  expiresIn: number = 60 * 5
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, expiresIn);
+  if (error) throw error;
+  return data.signedUrl;
 }

@@ -63,3 +63,8 @@ git_log.txt
 # DESIGN.md
 # PLANS.md
 
+# Documentation
+docs/
+
+# UNIT TESTS
+tests/

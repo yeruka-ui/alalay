@@ -3,29 +3,61 @@ import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
 import type { Medication, MedicationSchedule } from "@/types/database";
+import {
+  DAY_BATCH_SIZE,
+  createDateBatch,
+  getCalendarSelectionTransitionOffset,
+  getBatchStartForOffset,
+  getSelectedDateBatchState,
+  isSameDay,
+  startOfDay,
+} from "@/utils/dashboardCalendar";
 import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { Stack } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
 import {
   ActivityIndicator,
-  Dimensions,
+  Animated,
+  Easing,
   Modal,
   Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
+
+const CALENDAR_PADDING = 60;
+const CALENDAR_GAP = 8;
+const ACTIVE_WIDTH_BONUS = 28;
+const PAGE_BUFFER = 120;
+const CENTER_PAGE_INDEX = PAGE_BUFFER;
+const DAY_BATCH_CENTER_INDEX = Math.floor(DAY_BATCH_SIZE / 2);
+const CALENDAR_RECENTER_ANIMATION_MS = 180;
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const initialSelectedDate = startOfDay(new Date());
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const [batchAnchorStart, setBatchAnchorStart] = useState(() =>
+    getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
+  );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+  const carouselRef = useRef<ICarouselInstance>(null);
+  const shouldResetCarouselRef = useRef(false);
+  const pendingTransitionOffsetRef = useRef(0);
+  const calendarTranslateX = useRef(new Animated.Value(0)).current;
+  const pageOffsets = useMemo(
+    () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
+    [],
+  );
 
   // **************************** TAB FILTER LOGIC ****************************
   // Variable to track active and inactive tabs
@@ -41,9 +73,11 @@ export default function Dashboard() {
   const [schedules, setSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
   const [allMedications, setAllMedications] = useState<Medication[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoadingData(true);
+    setFetchError(null);
     try {
       const [schedulesData, medsData] = await Promise.all([
         getSchedulesForDate(selectedDate),
@@ -51,8 +85,16 @@ export default function Dashboard() {
       ]);
       setSchedules(schedulesData);
       setAllMedications(medsData);
-    } catch {
-      // Silently fail — user may not be logged in yet
+    } catch (err) {
+      const isAuthError =
+        err instanceof Error &&
+        (err.message.includes("Not authenticated") ||
+          err.message.includes("JWT"));
+      setFetchError(
+        isAuthError
+          ? "Your session expired. Please log in again."
+          : "Could not load data. Pull to retry."
+      );
     } finally {
       setIsLoadingData(false);
     }
@@ -104,28 +146,6 @@ export default function Dashboard() {
     return short ? daysShort[dayIndex] : daysLong[dayIndex];
   };
 
-  const generateDates = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const dates = [];
-
-    // Add 2 days from previous month for padding
-    dates.push(new Date(year, month, -1)); // second-to-last day of previous month
-    dates.push(new Date(year, month, 0)); // last day of previous month
-
-    // Add all days of current month
-    const lastDay = new Date(year, month + 1, 0);
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      dates.push(new Date(year, month, day));
-    }
-
-    // Add 2 days from next month for padding
-    dates.push(new Date(year, month + 1, 1));
-    dates.push(new Date(year, month + 1, 2));
-
-    return dates;
-  };
-
   const formatTime = (t: string | null) => {
     if (!t) return "No time set";
     const [h, m] = t.split(":");
@@ -135,51 +155,66 @@ export default function Dashboard() {
     return `${hour12}:${m} ${ampm}`;
   };
 
-  const dates = generateDates(selectedDate);
+  const handleSelectedDateChange = (date: Date, transitionOffset: number = 0) => {
+    const nextSelectionState = getSelectedDateBatchState(date);
 
-  // Card dimensions from styles
-  const CARD_WIDTH = 50;
-  const ACTIVE_CARD_WIDTH = 90;
-  const GAP = 10;
+    pendingTransitionOffsetRef.current = transitionOffset;
+    setSelectedDate(nextSelectionState.selectedDate);
+    shouldResetCarouselRef.current = true;
+    setBatchAnchorStart(nextSelectionState.batchAnchorStart);
+  };
 
-  const scrollToDate = (index: number) => {
-    const screenWidth = Dimensions.get("window").width;
-    // Account for container (10) + purplePanel (20) padding on both sides
-    const totalHorizontalPadding = (10 + 20) * 2;
-    const visibleWidth = screenWidth - totalHorizontalPadding;
-
-    let scrollPosition = 0;
-
-    // Calculate cumulative width up to this card
-    for (let i = 0; i < index; i++) {
-      scrollPosition += CARD_WIDTH + GAP;
-    }
-
-    // Add half of the active card to get to its center
-    scrollPosition += ACTIVE_CARD_WIDTH / 2;
-
-    // Subtract half of visible width to center the card
-    scrollPosition -= visibleWidth / 2;
-
-    scrollViewRef.current?.scrollTo({
-      x: scrollPosition,
-      animated: true,
+  const handleDayPress = (
+    date: Date,
+    pressedIndex: number,
+    pageDates: Date[],
+  ) => {
+    const currentSelectedIndex = pageDates.findIndex((pageDate) =>
+      isSameDay(pageDate, selectedDate),
+    );
+    const transitionOffset = getCalendarSelectionTransitionOffset({
+      pressedIndex,
+      currentSelectedIndex: currentSelectedIndex >= 0 ? currentSelectedIndex : null,
+      nextSelectedIndex: DAY_BATCH_CENTER_INDEX,
+      activeCardWidth,
+      inactiveCardWidth,
+      gap: CALENDAR_GAP,
     });
+
+    handleSelectedDateChange(date, transitionOffset);
   };
 
   useEffect(() => {
-    const selectedIndex = dates.findIndex(
-      (date) =>
-        date.getDate() === selectedDate.getDate() &&
-        date.getMonth() === selectedDate.getMonth() &&
-        date.getFullYear() === selectedDate.getFullYear(),
-    );
+    if (!shouldResetCarouselRef.current) {
+      return;
+    }
 
-    setTimeout(
-      () => scrollToDate(selectedIndex !== -1 ? selectedIndex : 0),
-      100,
-    );
-  }, [selectedDate]);
+    carouselRef.current?.scrollTo({ index: CENTER_PAGE_INDEX, animated: false });
+    calendarTranslateX.stopAnimation();
+
+    const transitionOffset = pendingTransitionOffsetRef.current;
+    if (transitionOffset !== 0) {
+      calendarTranslateX.setValue(transitionOffset);
+      Animated.timing(calendarTranslateX, {
+        toValue: 0,
+        duration: CALENDAR_RECENTER_ANIMATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      calendarTranslateX.setValue(0);
+    }
+
+    pendingTransitionOffsetRef.current = 0;
+    shouldResetCarouselRef.current = false;
+  }, [batchAnchorStart, calendarTranslateX]);
+
+  const calendarWidth = Math.max(screenWidth - CALENDAR_PADDING, 260);
+  const inactiveCardWidth = Math.floor(
+    (calendarWidth - CALENDAR_GAP * (DAY_BATCH_SIZE - 1) - ACTIVE_WIDTH_BONUS) /
+      DAY_BATCH_SIZE,
+  );
+  const activeCardWidth = inactiveCardWidth + ACTIVE_WIDTH_BONUS;
 
   return (
     <>
@@ -194,7 +229,7 @@ export default function Dashboard() {
                     {getMonthName(selectedDate.getMonth())}{" "}
                     {selectedDate.getFullYear()}
                   </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
+                  <Text style={styles.dropdownArrow}>v</Text>
                 </View>
               </TouchableOpacity>
 
@@ -209,49 +244,65 @@ export default function Dashboard() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dateCarousel}
-            >
-              {dates.map((date, index) => {
-                const isSelected =
-                  date.getDate() === selectedDate.getDate() &&
-                  date.getMonth() === selectedDate.getMonth() &&
-                  date.getFullYear() === selectedDate.getFullYear();
+            <Carousel
+              ref={carouselRef}
+              data={pageOffsets}
+              defaultIndex={CENTER_PAGE_INDEX}
+              height={160}
+              loop={false}
+              overscrollEnabled={false}
+              pagingEnabled
+              style={styles.dateCarouselContainer}
+              width={calendarWidth}
+              windowSize={5}
+              renderItem={({ item }) => {
+                const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
 
                 return (
-                  <TouchableOpacity
-                    key={date.toISOString()}
-                    style={isSelected ? styles.activeCard : styles.inactiveCard}
-                    onPress={() => {
-                      setSelectedDate(new Date(date));
-                      scrollToDate(index);
+                  <Animated.View
+                    style={{
+                      transform: [{ translateX: calendarTranslateX }],
                     }}
                   >
-                    <Text
-                      style={
-                        isSelected
-                          ? styles.dateNumberActive
-                          : styles.dateNumberInactive
-                      }
-                    >
-                      {date.getDate()}
-                    </Text>
-                    <Text
-                      style={
-                        isSelected
-                          ? styles.dayNameActive
-                          : styles.dayNameInactive
-                      }
-                    >
-                      {getDayName(date.getDay(), !isSelected)}
-                    </Text>
-                  </TouchableOpacity>
+                    <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
+                    {pageDates.map((date, index) => {
+                      const isSelected = isSameDay(date, selectedDate);
+
+                      return (
+                        <TouchableOpacity
+                          key={date.toISOString()}
+                          style={[
+                            isSelected ? styles.activeCard : styles.inactiveCard,
+                            { width: isSelected ? activeCardWidth : inactiveCardWidth },
+                          ]}
+                          onPress={() => handleDayPress(date, index, pageDates)}
+                        >
+                          <Text
+                            style={
+                              isSelected
+                                ? styles.dateNumberActive
+                                : styles.dateNumberInactive
+                            }
+                          >
+                            {date.getDate()}
+                          </Text>
+                          <Text
+                            style={
+                              isSelected
+                                ? styles.dayNameActive
+                                : styles.dayNameInactive
+                            }
+                          >
+                            {getDayName(date.getDay(), !isSelected)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    </View>
+                  </Animated.View>
                 );
-              })}
-            </ScrollView>
+              }}
+            />
           </View>
         </View>
         <TabFilterBar
@@ -259,6 +310,13 @@ export default function Dashboard() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
+
+        {/* Error banner */}
+        {!!fetchError && (
+          <View style={styles.fetchErrorBanner}>
+            <Text style={styles.fetchErrorText}>{fetchError}</Text>
+          </View>
+        )}
 
         {/* Medication Schedule List */}
         {isLoadingData ? (
@@ -330,14 +388,14 @@ export default function Dashboard() {
               mode="date"
               display="spinner"
               onChange={(_: DateTimePickerEvent, date?: Date) => {
-                if (date) setSelectedDate(date);
+                if (date) handleSelectedDateChange(date);
               }}
             />
           </View>
         </Modal>
       )}
 
-      {/* Android: native calendar dialog — auto-dismisses on selection or cancel */}
+      {/* Android: native calendar dialog - auto-dismisses on selection or cancel */}
       {Platform.OS === "android" && isDropdownOpen && (
         <DateTimePicker
           value={selectedDate}
@@ -345,7 +403,7 @@ export default function Dashboard() {
           display="default"
           onChange={(event: DateTimePickerEvent, date?: Date) => {
             setIsDropdownOpen(false);
-            if (event.type !== "dismissed" && date) setSelectedDate(date);
+            if (event.type !== "dismissed" && date) handleSelectedDateChange(date);
           }}
         />
       )}
