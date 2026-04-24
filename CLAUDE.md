@@ -43,15 +43,18 @@ app/
 - **Known issue (BUG-12 / T-031):** `<Slot/>` renders unconditionally — not gated on `ready`. Authenticated users see a brief flash of the onboard screen on cold start until T-031 is fixed. `segments` in the guard deps array is also a new array reference each render.
 
 **Key data flow for prescription OCR:**
-`Image capture → base64 upload to Gemini API → JSON parse (parseMedications) → fuzzy validation (medicationValidator) → MedicationCard list with edit/suggestion/confidence UI`
+`Image capture → base64 → supabase.functions.invoke("analyze-prescription") → Edge Function calls Gemini (server-side key) → parses JSON → returns MedicationItem[] → fuzzy validation (medicationValidator) → MedicationCard list`
+
+**Key data flow for voice medications:**
+`Audio recording → base64 → supabase.functions.invoke("analyze-audio") → Edge Function calls Gemini → returns MedicationItem[] → MedicationCard list`
 
 **Styles:** `styles/index.styles.ts` holds shared styles (imported as `sharedStyles`). Each screen with significant styling has its own file: `styles/prescription_camera.styles.ts`, `styles/alalay_chat.styles.ts`, `styles/talk_to_alalay.styles.ts`, `styles/login.styles.ts`, `styles/onboard.styles.ts`.
 
 **State management:** Local `useState` only (no global store).
 
-**Backend:** Supabase client configured in `utils/supabase.ts` with AsyncStorage session persistence. Credentials via `.env` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GEMINI_API_KEY`).
+**Backend:** Supabase client configured in `utils/supabase.ts` with AsyncStorage session persistence. Client env vars: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Gemini API key is **server-side only** — set via `npx supabase secrets set GEMINI_API_KEY=...`, never in `.env`.
 
-> ⚠️ `.env.example` currently uses `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (wrong names). Must be `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`. See BUG-13 / T-030.
+**AI proxy:** `utils/ai.ts` exposes `analyzePrescription` and `analyzeAudio` — both call Supabase Edge Functions (`supabase/functions/analyze-prescription/` and `supabase/functions/analyze-audio/`). Edge Functions verify the user's auth server-side via `supabase.auth.getUser()` (ES256-safe), then call Gemini internally and return typed `MedicationItem[]`.
 
 **Database schema** defined in `supabase/migration.sql`. Tables: `profiles`, `prescriptions`, `medications`, `medication_schedules`, `medical_records`. All tables have RLS policies scoped to `auth.uid()`. Storage buckets: `prescriptions`, `medical-records`.
 
@@ -77,9 +80,14 @@ app/
 | `components/tabFilterBar.tsx` | Reusable tab/filter bar used on dashboard and record locker |
 | `utils/medicationValidator.ts` | fuse.js fuzzy match against known drug names |
 | `data/medicationDatabase.ts` | ~225 Philippine generic + brand medication names |
+| `utils/ai.ts` | AI proxy — `analyzePrescription` + `analyzeAudio` via Supabase Edge Functions |
 | `utils/database.ts` | CRUD helpers for Supabase (savePrescription, getSchedulesForDate, etc.) |
 | `utils/supabase.ts` | Supabase client with AsyncStorage session persistence |
 | `utils/auth.ts` | Auth helpers (signInWithEmail, signUpWithEmail, saveRememberedIdentifier, getRememberedIdentifier). Note: drops `data` from responses — see DEBT-08 / T-038 |
+| `supabase/functions/analyze-prescription/index.ts` | Edge Function: verifies JWT via `auth.getUser()`, image → Gemini → MedicationItem[] |
+| `supabase/functions/analyze-audio/index.ts` | Edge Function: verifies JWT via `auth.getUser()`, audio → Gemini → MedicationItem[] |
+| `supabase/functions/_shared/gemini.ts` | Shared Deno helpers: callGemini, parseMedications, GeminiError |
+| `supabase/config.toml` | Function config: `verify_jwt = false` for both AI functions (gateway auth disabled; in-function auth via GoTrue) |
 | `styles/login.styles.ts` | Shared styles for login and signup screens |
 | `styles/onboard.styles.ts` | Styles for the onboard landing screen |
 | `types/database.ts` | TypeScript types matching Supabase schema |

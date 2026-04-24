@@ -7,6 +7,12 @@
 
 ## P0 — Blockers (Ship Nothing Until These Are Done)
 
+### [x] ES256 JWT Auth Fix (2026-04-22)
+**Files:** `supabase/config.toml` (new), `supabase/functions/analyze-prescription/index.ts`, `supabase/functions/analyze-audio/index.ts`
+**Fixed:** Edge Functions gateway 401 rejection on ES256 tokens. Added server-side auth in both AI functions via `supabase.auth.getUser()`. Functions redeployed.
+
+---
+
 ### [T-001] Fix: Voice flow doesn't save medications
 **File:** `app/talk_to_alalay.tsx:260`  
 **Description:** `handleAddToAlalay` shows an alert and navigates back without calling `savePrescription`. Medications extracted via voice are lost.  
@@ -28,21 +34,21 @@
 
 ---
 
-### [T-004] Fix: Gemini API key exposed in client bundle
-**File:** `app/prescription_camera.tsx:115`, `app/talk_to_alalay.tsx:85`  
-**Description:** `EXPO_PUBLIC_GEMINI_API_KEY` is baked into the JS bundle. Anyone with the APK can extract it.  
-**Success criteria:**  
-1. Create `supabase/functions/analyze-prescription/index.ts` Edge Function that accepts `{ base64: string, mimeType: string }` and calls Gemini internally.  
-2. Create `supabase/functions/analyze-audio/index.ts` for the voice flow.  
-3. Remove `EXPO_PUBLIC_GEMINI_API_KEY` from `.env` and all client code.  
-4. Verify neither function name nor key appears in the built JS bundle (`npx expo export` + grep).
+### [x] [T-004] Fix: Gemini API key exposed in client bundle
+**Fixed 2026-04-21**  
+- `supabase/functions/analyze-prescription/index.ts` — image flow  
+- `supabase/functions/analyze-audio/index.ts` — voice flow  
+- `supabase/functions/_shared/gemini.ts` — shared callGemini + parseMedications  
+- `utils/ai.ts` — client wrapper using `supabase.functions.invoke`  
+- `EXPO_PUBLIC_GEMINI_API_KEY` removed from `.env.example` and all client code  
+- **Deploy:** `npx supabase secrets set GEMINI_API_KEY=... && npx supabase functions deploy analyze-prescription && npx supabase functions deploy analyze-audio`
 
 ---
 
 ### [x] [T-030] Fix: `.env.example` uses wrong Supabase variable names
 **File:** `.env.example:5-6`  
-**Description:** `.env.example` documents `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, but `utils/supabase.ts` reads `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Fresh clone crashes.  
-**Success criteria:** `.env.example` updated to `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. All other vars verified correct against their consumers.
+**Description:** `.env.example` documents `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, but `utils/supabase.ts` reads `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Fresh clone crashes.  
+**Success criteria:** `.env.example` updated to `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. All other vars verified correct against their consumers.
 
 ---
 
@@ -65,13 +71,8 @@
 
 ---
 
-### [T-007] Refactor: Extract and deduplicate `parseMedications`
-**Files:** `app/prescription_camera.tsx:85`, `app/talk_to_alalay.tsx:66`  
-**Description:** Identical function in two files. Also uses `item: any`.  
-**Success criteria:**  
-1. Create `utils/gemini.ts` with `interface GeminiMedicationItem` and `parseMedications(text: string): MedicationItem[]`  
-2. Both screens import from `utils/gemini.ts`  
-3. No `any` types in the parse logic
+### [x] [T-007] Refactor: Extract and deduplicate `parseMedications`
+**Fixed 2026-04-21** — consolidated in `supabase/functions/_shared/gemini.ts` (runs server-side). Client copies in both screens deleted. `Record<string, unknown>` replaces `any`. Bundled with T-004.
 
 ---
 

@@ -22,6 +22,7 @@ import Animated, {
 import MedicationCard, {
   type MedicationItem,
 } from "@/components/MedicationCard";
+import { analyzeAudio } from "@/utils/ai";
 import { styles as sharedStyles } from "@/styles/index.styles";
 import { styles } from "@/styles/talk_to_alalay.styles";
 import { savePrescription } from "@/utils/database";
@@ -71,75 +72,15 @@ export default function TalkToAlalay() {
     scale3.value = withSpring(MIN_SCALE, cfg);
   };
 
-  const parseMedications = (text: string): MedicationItem[] => {
-    let cleaned = text.trim();
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-    const parsed = JSON.parse(cleaned);
-    const arr = Array.isArray(parsed) ? parsed : [parsed];
-    return arr.map((item: any, index: number) => ({
-      id: `${Date.now()}-${index}`,
-      name: item.name || "Unknown Medication",
-      instructions: item.instructions || "",
-      time: item.time || "",
-      dosage: item.dosage,
-    }));
-  };
-
   const sendToGemini = async (uri: string) => {
     setPhase("processing");
     try {
-      const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-      if (!geminiKey) throw new Error("Gemini API key missing in .env");
-
       const base64Audio = await FileSystem.readAsStringAsync(uri, {
         encoding: "base64",
       });
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { inlineData: { mimeType: "audio/mp4", data: base64Audio } },
-                  {
-                    text: `The user has spoken a description of their medication(s). Listen to the audio and extract each medication into a JSON array.
-IMPORTANT: Create a SEPARATE entry for EACH time slot. If a medication is taken 3 times a day, output 3 separate objects with the same name but different times.
-Each object must have: "name" (string), "instructions" (string, e.g. "after eating"), "time" (string, e.g. "9:00 AM"), "dosage" (string, e.g. "500mg").
-If time is not mentioned, infer reasonable defaults based on frequency (once daily: "8:00 AM", twice daily: "8:00 AM" and "8:00 PM", three times daily: "8:00 AM", "1:00 PM", "8:00 PM").
-Return ONLY the JSON array, no other text.
-Example: [{"name":"Paracetamol","instructions":"after eating","time":"8:00 AM","dosage":"500mg"}]`,
-                  },
-                ],
-              },
-            ],
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error(
-            "Quota limit reached. Wait a minute and try again, or enable billing on your Google AI account.",
-          );
-        }
-        if (response.status === 503) {
-          throw new Error(
-            "Gemini model is temporarily unavailable. Try again in a moment.",
-          );
-        }
-        const err = await response.text();
-        throw new Error(`Gemini error: ${response.status} ${err}`);
-      }
-
-      const result = await response.json();
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-      setMedications(parseMedications(text));
+      const medications = await analyzeAudio(base64Audio, "audio/mp4");
+      setMedications(medications);
       setPhase("results");
     } catch (error: any) {
       console.error("Gemini error:", error);

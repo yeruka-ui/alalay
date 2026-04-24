@@ -20,6 +20,26 @@
 
 ## Recent Changes
 
+### 2026-04-22 — ES256 JWT Auth Fix (Edge Function Gateway Compatibility)
+
+✅ **Issue:** Edge Functions gateway rejected ES256-signed tokens with 401 `UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM`.  
+✅ **Root cause:** Project JWT signing key rotated to ES256 (asymmetric). Gateway verifier expected HS256.  
+✅ **Fix:** Created `supabase/config.toml` disabling gateway JWT verify for both AI functions. Added server-side auth in `analyze-prescription/index.ts` and `analyze-audio/index.ts` via `supabase.auth.getUser()` (GoTrue v2.188.1 supports ES256 natively).  
+✅ **Deployment:** Both functions redeployed to project `yrhqatpczliqdfytpvoy`.  
+✅ **Result:** Client `supabase.functions.invoke()` calls now succeed; requests pass gateway → function auth check → Gemini call.
+
+---
+
+### 2026-04-21 — SEC-01 / T-004 / DEBT-01 / T-007 (Gemini Proxy + parseMedications extraction)
+
+✅ **SEC-01 / T-004 fixed:** Gemini API key removed from client bundle. Both call sites now proxy through Supabase Edge Functions (`analyze-prescription`, `analyze-audio`). Key lives in Supabase secrets only.  
+✅ **DEBT-01 / T-007 fixed:** `parseMedications` deduplicated — single implementation in `supabase/functions/_shared/gemini.ts`. Both `prescription_camera.tsx` and `talk_to_alalay.tsx` local copies deleted. `item: any` eliminated.  
+✅ **T-030 confirmed fixed:** `.env.example` corrected — `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and comment pointing to `supabase secrets set` for Gemini key.  
+✅ **Error contract standardized:** Edge Functions return `{ error: { code, message } }` with typed `AiErrorCode`; `utils/ai.ts` maps codes to user-facing strings via `mapAiError`.  
+✅ **Models unified:** Both flows now use `gemini-3.1-flash-lite-preview` (was `gemini-2.5-flash` for audio).
+
+---
+
 ### 2026-04-19 — Auth Hardening (Phase 0.2 complete)
 
 ✅ **T-030 / BUG-13 fixed:** `.env.example` updated to correct `EXPO_PUBLIC_*` variable names  
@@ -80,18 +100,9 @@
 
 ## Security Findings
 
-### SEC-01 — Gemini API Key Exposed in Client Bundle
-**CVSS: 8.2 (High)**
+### ~~SEC-01~~ — Gemini API Key Exposed in Client Bundle ✅ Fixed 2026-04-21 (T-004)
 
-`EXPO_PUBLIC_GEMINI_API_KEY` is embedded into the JavaScript bundle at build time. Any user who decompiles the APK/IPA can extract it.
-
-```ts
-// prescription_camera.tsx:115, talk_to_alalay.tsx:85
-const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-```
-
-**Blast radius:** Billing fraud, quota exhaustion, unauthorized AI API usage.  
-**Fix:** Proxy all Gemini calls through a Supabase Edge Function. The key lives server-side only; the client calls the Edge Function with a Supabase JWT.
+Key moved to `supabase secrets`. Client uses `supabase.functions.invoke` with JWT. Edge Functions `analyze-prescription` + `analyze-audio` proxy Gemini internally.
 
 ---
 
@@ -272,14 +283,13 @@ async function handleForgotPassword() {
 
 ## Technical Debt
 
-### DEBT-01 — `parseMedications` Duplicated
-Identical function exists in `prescription_camera.tsx:85` and `talk_to_alalay.tsx:66`. Should be extracted to `utils/gemini.ts`.
+### ~~DEBT-01~~ — `parseMedications` Duplicated ✅ Fixed 2026-04-21 (T-007)
 
-### DEBT-02 — `any` Types in AI Response Parsing
-```ts
-arr.map((item: any, index: number) => ({ ... }))
-```
-Bypasses TypeScript safety for the most critical data transform. Should define a `GeminiMedicationItem` interface.
+Single implementation in `supabase/functions/_shared/gemini.ts`. Both client copies deleted.
+
+### ~~DEBT-02~~ — `any` Types in AI Response Parsing ✅ Fixed 2026-04-21 (T-007)
+
+`parseMedications` in `supabase/functions/_shared/gemini.ts` uses `Record<string, unknown>` with explicit field guards. No `any`.
 
 ### DEBT-03 — Inline Style Objects in Dashboard JSX
 `dashboard.tsx` lines 257–295, 307–326 define many styles inline, creating new object references every render. Should move to `StyleSheet.create()`.
