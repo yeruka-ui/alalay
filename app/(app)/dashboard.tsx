@@ -26,7 +26,7 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
+  Animated as RNAnimated,
   Easing,
   Modal,
   NativeScrollEvent,
@@ -38,6 +38,14 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import Animated, {
+  Easing as ReanimatedEasing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from "react-native-reanimated";
 import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
 
 const CALENDAR_PADDING = 60;
@@ -52,6 +60,168 @@ const CALENDAR_COLLAPSED_HEIGHT = COLLAPSED_SELECTED_DAY_HEIGHT + 16;
 const CALENDAR_COLLAPSE_ANIMATION_MS = 300;
 const PURPLE_PANEL_EXPANDED_PADDING_BOTTOM = 35;
 const PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM = 18;
+const DAY_LABEL_EXPANDED_MARGIN_TOP = 4;
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
+type CalendarDayCardProps = {
+  date: Date;
+  dayLabel: string;
+  isSelected: boolean;
+  collapseProgress: SharedValue<number>;
+  activeCardWidth: number;
+  inactiveCardWidth: number;
+  onPress: () => void;
+};
+
+function CalendarDayCard({
+  date,
+  dayLabel,
+  isSelected,
+  collapseProgress,
+  activeCardWidth,
+  inactiveCardWidth,
+  onPress,
+}: CalendarDayCardProps) {
+  const expandedPresentation = getCalendarDayPresentation({
+    isCollapsed: false,
+    isSelected,
+    activeCardWidth,
+    inactiveCardWidth,
+    collapsedDaySize: inactiveCardWidth,
+  });
+  const collapsedPresentation = getCalendarDayPresentation({
+    isCollapsed: true,
+    isSelected,
+    activeCardWidth,
+    inactiveCardWidth,
+    collapsedDaySize: inactiveCardWidth,
+  });
+  const collapsedHeightRatio =
+    collapsedPresentation.height / expandedPresentation.height;
+  const collapsedNumberScale =
+    collapsedPresentation.numberFontSize / expandedPresentation.numberFontSize;
+
+  const animatedBackgroundStyle = useAnimatedStyle(() => ({
+    borderRadius: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [expandedPresentation.borderRadius, collapsedPresentation.borderRadius],
+    ),
+    transform: [
+      {
+        scaleY: interpolate(
+          collapseProgress.value,
+          [0, 1],
+          [1, collapsedHeightRatio],
+        ),
+      },
+    ],
+  }));
+
+  const animatedNumberStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: interpolate(
+          collapseProgress.value,
+          [0, 1],
+          [1, collapsedNumberScale],
+        ),
+      },
+      {
+        translateY: interpolate(collapseProgress.value, [0, 1], [0, 2]),
+      },
+    ],
+  }));
+
+  const animatedLabelStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(collapseProgress.value, [0, 1], [1, 0]),
+    transform: [
+      {
+        translateY: interpolate(collapseProgress.value, [0, 1], [0, -10]),
+      },
+      {
+        scale: interpolate(collapseProgress.value, [0, 1], [1, 0.85]),
+      },
+    ],
+  }));
+
+  const animatedContentStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY: interpolate(collapseProgress.value, [0, 1], [0, 6]),
+      },
+    ],
+  }));
+
+  return (
+    <AnimatedTouchableOpacity
+      style={[
+        {
+          width: expandedPresentation.width,
+          height: expandedPresentation.height,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+      ]}
+      onPress={onPress}
+    >
+      <Animated.View
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
+        pointerEvents="none"
+        style={[
+          isSelected ? styles.activeCard : styles.inactiveCard,
+          {
+            position: "absolute",
+            width: expandedPresentation.width,
+            height: expandedPresentation.height,
+            padding: expandedPresentation.padding,
+          },
+          animatedBackgroundStyle,
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            inset: 0,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          animatedContentStyle,
+        ]}
+      >
+        <Animated.Text
+          style={[
+            isSelected
+              ? styles.dateNumberActive
+              : styles.dateNumberInactive,
+            animatedNumberStyle,
+          ]}
+        >
+          {date.getDate()}
+        </Animated.Text>
+        <Animated.Text
+          style={[
+            isSelected
+              ? styles.dayNameActive
+              : styles.dayNameInactive,
+            {
+              position: "absolute",
+              bottom: isSelected ? 18 : 16,
+              marginTop: DAY_LABEL_EXPANDED_MARGIN_TOP,
+            },
+            animatedLabelStyle,
+          ]}
+        >
+          {dayLabel}
+        </Animated.Text>
+      </Animated.View>
+    </AnimatedTouchableOpacity>
+  );
+}
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
@@ -66,8 +236,8 @@ export default function Dashboard() {
   const shouldResetCarouselRef = useRef(false);
   const pendingTransitionOffsetRef = useRef(0);
   const previousScrollOffsetYRef = useRef(0);
-  const calendarTranslateX = useRef(new Animated.Value(0)).current;
-  const calendarCollapseProgress = useRef(new Animated.Value(0)).current;
+  const calendarTranslateX = useRef(new RNAnimated.Value(0)).current;
+  const calendarCollapseProgress = useSharedValue(0);
   const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(false);
   const pageOffsets = useMemo(
     () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
@@ -210,7 +380,7 @@ export default function Dashboard() {
     const transitionOffset = pendingTransitionOffsetRef.current;
     if (transitionOffset !== 0) {
       calendarTranslateX.setValue(transitionOffset);
-      Animated.timing(calendarTranslateX, {
+      RNAnimated.timing(calendarTranslateX, {
         toValue: 0,
         duration: CALENDAR_RECENTER_ANIMATION_MS,
         easing: Easing.out(Easing.cubic),
@@ -231,36 +401,58 @@ export default function Dashboard() {
   );
   const activeCardWidth = inactiveCardWidth + ACTIVE_WIDTH_BONUS;
   const selectedDayPresentation = getCalendarDayPresentation({
-    isCollapsed: isCalendarCollapsed,
+    isCollapsed: false,
     isSelected: true,
     activeCardWidth,
     inactiveCardWidth,
+    collapsedDaySize: inactiveCardWidth,
   });
   const inactiveDayPresentation = getCalendarDayPresentation({
-    isCollapsed: isCalendarCollapsed,
+    isCollapsed: false,
     isSelected: false,
     activeCardWidth,
     inactiveCardWidth,
+    collapsedDaySize: inactiveCardWidth,
   });
-  const calendarHeight = calendarCollapseProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [CALENDAR_EXPANDED_HEIGHT, CALENDAR_COLLAPSED_HEIGHT],
-  });
-  const purplePanelPaddingBottom = calendarCollapseProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      PURPLE_PANEL_EXPANDED_PADDING_BOTTOM,
-      PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM,
+  const purplePanelAnimatedStyle = useAnimatedStyle(() => ({
+    minHeight: 0,
+    paddingBottom: interpolate(
+      calendarCollapseProgress.value,
+      [0, 1],
+      [
+        PURPLE_PANEL_EXPANDED_PADDING_BOTTOM,
+        PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM,
+      ],
+    ),
+  }));
+  const calendarContainerAnimatedStyle = useAnimatedStyle(() => ({
+    height: interpolate(
+      calendarCollapseProgress.value,
+      [0, 1],
+      [CALENDAR_EXPANDED_HEIGHT, CALENDAR_COLLAPSED_HEIGHT],
+    ),
+    overflow: "hidden",
+  }));
+  const calendarRailAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY: interpolate(
+          calendarCollapseProgress.value,
+          [0, 1],
+          [0, -(CALENDAR_EXPANDED_HEIGHT - CALENDAR_COLLAPSED_HEIGHT) / 2],
+        ),
+      },
     ],
-  });
+  }));
 
   useEffect(() => {
-    Animated.timing(calendarCollapseProgress, {
-      toValue: isCalendarCollapsed ? 1 : 0,
-      duration: CALENDAR_COLLAPSE_ANIMATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
+    calendarCollapseProgress.value = withTiming(
+      isCalendarCollapsed ? 1 : 0,
+      {
+        duration: CALENDAR_COLLAPSE_ANIMATION_MS,
+        easing: ReanimatedEasing.out(ReanimatedEasing.cubic),
+      },
+    );
   }, [calendarCollapseProgress, isCalendarCollapsed]);
 
   const handleContentScroll = useCallback(
@@ -289,10 +481,7 @@ export default function Dashboard() {
           <Animated.View
             style={[
               styles.purplePanel,
-              {
-                minHeight: 0,
-                paddingBottom: purplePanelPaddingBottom,
-              },
+              purplePanelAnimatedStyle,
             ]}
           >
             <View style={styles.header}>
@@ -317,85 +506,51 @@ export default function Dashboard() {
               </TouchableOpacity>
             </View>
 
-            <Animated.View
-              style={{
-                height: calendarHeight,
-                overflow: "hidden",
-              }}
-            >
-              <Carousel
-                ref={carouselRef}
-                data={pageOffsets}
-                defaultIndex={CENTER_PAGE_INDEX}
-                height={isCalendarCollapsed ? CALENDAR_COLLAPSED_HEIGHT : CALENDAR_EXPANDED_HEIGHT}
-                loop={false}
-                overscrollEnabled={false}
-                pagingEnabled
-                style={styles.dateCarouselContainer}
-                width={calendarWidth}
-                windowSize={5}
-                renderItem={({ item }) => {
-                  const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
+            <Animated.View style={calendarContainerAnimatedStyle}>
+              <Animated.View style={calendarRailAnimatedStyle}>
+                <Carousel
+                  ref={carouselRef}
+                  data={pageOffsets}
+                  defaultIndex={CENTER_PAGE_INDEX}
+                  height={CALENDAR_EXPANDED_HEIGHT}
+                  loop={false}
+                  overscrollEnabled={false}
+                  pagingEnabled
+                  style={styles.dateCarouselContainer}
+                  width={calendarWidth}
+                  windowSize={5}
+                  renderItem={({ item }) => {
+                    const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
 
-                  return (
-                    <Animated.View
-                      style={{
-                        transform: [{ translateX: calendarTranslateX }],
-                      }}
-                    >
-                      <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
-                        {pageDates.map((date, index) => {
-                          const isSelected = isSameDay(date, selectedDate);
-                          const presentation = getCalendarDayPresentation({
-                            isCollapsed: isCalendarCollapsed,
-                            isSelected,
-                            activeCardWidth,
-                            inactiveCardWidth,
-                          });
+                    return (
+                      <RNAnimated.View
+                        style={{
+                          transform: [{ translateX: calendarTranslateX }],
+                        }}
+                      >
+                        <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
+                          {pageDates.map((date, index) => {
+                            const isSelected = isSameDay(date, selectedDate);
 
-                          return (
-                            <TouchableOpacity
-                              key={date.toISOString()}
-                              style={[
-                                isSelected ? styles.activeCard : styles.inactiveCard,
-                                {
-                                  width: presentation.width,
-                                  height: presentation.height,
-                                  borderRadius: presentation.borderRadius,
-                                  padding: presentation.padding,
-                                },
-                              ]}
-                              onPress={() => handleDayPress(date, index, pageDates)}
-                            >
-                              <Text
-                                style={[
-                                  isSelected
-                                    ? styles.dateNumberActive
-                                    : styles.dateNumberInactive,
-                                  { fontSize: presentation.numberFontSize },
-                                ]}
-                              >
-                                {date.getDate()}
-                              </Text>
-                              {presentation.showDayLabel ? (
-                                <Text
-                                  style={
-                                    isSelected
-                                      ? styles.dayNameActive
-                                      : styles.dayNameInactive
-                                  }
-                                >
-                                  {getDayName(date.getDay(), !isSelected)}
-                                </Text>
-                              ) : null}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </Animated.View>
-                  );
-                }}
-              />
+                            return (
+                              <CalendarDayCard
+                                key={date.toISOString()}
+                                date={date}
+                                dayLabel={getDayName(date.getDay(), !isSelected)}
+                                isSelected={isSelected}
+                                collapseProgress={calendarCollapseProgress}
+                                activeCardWidth={activeCardWidth}
+                                inactiveCardWidth={inactiveCardWidth}
+                                onPress={() => handleDayPress(date, index, pageDates)}
+                              />
+                            );
+                          })}
+                        </View>
+                      </RNAnimated.View>
+                    );
+                  }}
+                />
+              </Animated.View>
             </Animated.View>
           </Animated.View>
         </View>
