@@ -6,12 +6,17 @@ import type { Medication, MedicationSchedule } from "@/types/database";
 import {
   DAY_BATCH_SIZE,
   createDateBatch,
-  getCalendarSelectionTransitionOffset,
   getBatchStartForOffset,
+  getCalendarSelectionTransitionOffset,
   getSelectedDateBatchState,
   isSameDay,
   startOfDay,
 } from "@/utils/dashboardCalendar";
+import { getNextCalendarCollapsedState } from "@/utils/dashboardCalendarCollapse";
+import {
+  COLLAPSED_SELECTED_DAY_HEIGHT,
+  getCalendarDayPresentation,
+} from "@/utils/dashboardCalendarPresentation";
 import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
@@ -19,12 +24,13 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
 import {
   ActivityIndicator,
   Animated,
   Easing,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   ScrollView,
   Text,
@@ -32,6 +38,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
 
 const CALENDAR_PADDING = 60;
 const CALENDAR_GAP = 8;
@@ -39,7 +46,12 @@ const ACTIVE_WIDTH_BONUS = 28;
 const PAGE_BUFFER = 120;
 const CENTER_PAGE_INDEX = PAGE_BUFFER;
 const DAY_BATCH_CENTER_INDEX = Math.floor(DAY_BATCH_SIZE / 2);
-const CALENDAR_RECENTER_ANIMATION_MS = 180;
+const CALENDAR_RECENTER_ANIMATION_MS = 300;
+const CALENDAR_EXPANDED_HEIGHT = 160;
+const CALENDAR_COLLAPSED_HEIGHT = COLLAPSED_SELECTED_DAY_HEIGHT + 16;
+const CALENDAR_COLLAPSE_ANIMATION_MS = 300;
+const PURPLE_PANEL_EXPANDED_PADDING_BOTTOM = 35;
+const PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM = 18;
 
 export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
@@ -53,7 +65,10 @@ export default function Dashboard() {
   const carouselRef = useRef<ICarouselInstance>(null);
   const shouldResetCarouselRef = useRef(false);
   const pendingTransitionOffsetRef = useRef(0);
+  const previousScrollOffsetYRef = useRef(0);
   const calendarTranslateX = useRef(new Animated.Value(0)).current;
+  const calendarCollapseProgress = useRef(new Animated.Value(0)).current;
+  const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(false);
   const pageOffsets = useMemo(
     () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
     [],
@@ -176,8 +191,8 @@ export default function Dashboard() {
       pressedIndex,
       currentSelectedIndex: currentSelectedIndex >= 0 ? currentSelectedIndex : null,
       nextSelectedIndex: DAY_BATCH_CENTER_INDEX,
-      activeCardWidth,
-      inactiveCardWidth,
+      activeCardWidth: selectedDayPresentation.width,
+      inactiveCardWidth: inactiveDayPresentation.width,
       gap: CALENDAR_GAP,
     });
 
@@ -212,16 +227,74 @@ export default function Dashboard() {
   const calendarWidth = Math.max(screenWidth - CALENDAR_PADDING, 260);
   const inactiveCardWidth = Math.floor(
     (calendarWidth - CALENDAR_GAP * (DAY_BATCH_SIZE - 1) - ACTIVE_WIDTH_BONUS) /
-      DAY_BATCH_SIZE,
+    DAY_BATCH_SIZE,
   );
   const activeCardWidth = inactiveCardWidth + ACTIVE_WIDTH_BONUS;
+  const selectedDayPresentation = getCalendarDayPresentation({
+    isCollapsed: isCalendarCollapsed,
+    isSelected: true,
+    activeCardWidth,
+    inactiveCardWidth,
+  });
+  const inactiveDayPresentation = getCalendarDayPresentation({
+    isCollapsed: isCalendarCollapsed,
+    isSelected: false,
+    activeCardWidth,
+    inactiveCardWidth,
+  });
+  const calendarHeight = calendarCollapseProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [CALENDAR_EXPANDED_HEIGHT, CALENDAR_COLLAPSED_HEIGHT],
+  });
+  const purplePanelPaddingBottom = calendarCollapseProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      PURPLE_PANEL_EXPANDED_PADDING_BOTTOM,
+      PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM,
+    ],
+  });
+
+  useEffect(() => {
+    Animated.timing(calendarCollapseProgress, {
+      toValue: isCalendarCollapsed ? 1 : 0,
+      duration: CALENDAR_COLLAPSE_ANIMATION_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [calendarCollapseProgress, isCalendarCollapsed]);
+
+  const handleContentScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const currentOffsetY = event.nativeEvent.contentOffset.y;
+      const nextCollapsedState = getNextCalendarCollapsedState({
+        currentOffsetY,
+        previousOffsetY: previousScrollOffsetYRef.current,
+        isCollapsed: isCalendarCollapsed,
+      });
+
+      previousScrollOffsetYRef.current = currentOffsetY;
+
+      if (nextCollapsedState !== isCalendarCollapsed) {
+        setIsCalendarCollapsed(nextCollapsedState);
+      }
+    },
+    [isCalendarCollapsed],
+  );
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.screen}>
-        <View style={styles.container}>
-          <View style={styles.purplePanel}>
+        <View style={[styles.container, { minHeight: 0 }]}>
+          <Animated.View
+            style={[
+              styles.purplePanel,
+              {
+                minHeight: 0,
+                paddingBottom: purplePanelPaddingBottom,
+              },
+            ]}
+          >
             <View style={styles.header}>
               <TouchableOpacity onPress={() => setIsDropdownOpen(true)}>
                 <View style={styles.monthContainer}>
@@ -244,66 +317,87 @@ export default function Dashboard() {
               </TouchableOpacity>
             </View>
 
-            <Carousel
-              ref={carouselRef}
-              data={pageOffsets}
-              defaultIndex={CENTER_PAGE_INDEX}
-              height={160}
-              loop={false}
-              overscrollEnabled={false}
-              pagingEnabled
-              style={styles.dateCarouselContainer}
-              width={calendarWidth}
-              windowSize={5}
-              renderItem={({ item }) => {
-                const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
-
-                return (
-                  <Animated.View
-                    style={{
-                      transform: [{ translateX: calendarTranslateX }],
-                    }}
-                  >
-                    <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
-                    {pageDates.map((date, index) => {
-                      const isSelected = isSameDay(date, selectedDate);
-
-                      return (
-                        <TouchableOpacity
-                          key={date.toISOString()}
-                          style={[
-                            isSelected ? styles.activeCard : styles.inactiveCard,
-                            { width: isSelected ? activeCardWidth : inactiveCardWidth },
-                          ]}
-                          onPress={() => handleDayPress(date, index, pageDates)}
-                        >
-                          <Text
-                            style={
-                              isSelected
-                                ? styles.dateNumberActive
-                                : styles.dateNumberInactive
-                            }
-                          >
-                            {date.getDate()}
-                          </Text>
-                          <Text
-                            style={
-                              isSelected
-                                ? styles.dayNameActive
-                                : styles.dayNameInactive
-                            }
-                          >
-                            {getDayName(date.getDay(), !isSelected)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                    </View>
-                  </Animated.View>
-                );
+            <Animated.View
+              style={{
+                height: calendarHeight,
+                overflow: "hidden",
               }}
-            />
-          </View>
+            >
+              <Carousel
+                ref={carouselRef}
+                data={pageOffsets}
+                defaultIndex={CENTER_PAGE_INDEX}
+                height={isCalendarCollapsed ? CALENDAR_COLLAPSED_HEIGHT : CALENDAR_EXPANDED_HEIGHT}
+                loop={false}
+                overscrollEnabled={false}
+                pagingEnabled
+                style={styles.dateCarouselContainer}
+                width={calendarWidth}
+                windowSize={5}
+                renderItem={({ item }) => {
+                  const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
+
+                  return (
+                    <Animated.View
+                      style={{
+                        transform: [{ translateX: calendarTranslateX }],
+                      }}
+                    >
+                      <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
+                        {pageDates.map((date, index) => {
+                          const isSelected = isSameDay(date, selectedDate);
+                          const presentation = getCalendarDayPresentation({
+                            isCollapsed: isCalendarCollapsed,
+                            isSelected,
+                            activeCardWidth,
+                            inactiveCardWidth,
+                          });
+
+                          return (
+                            <TouchableOpacity
+                              key={date.toISOString()}
+                              style={[
+                                isSelected ? styles.activeCard : styles.inactiveCard,
+                                {
+                                  width: presentation.width,
+                                  height: presentation.height,
+                                  borderRadius: presentation.borderRadius,
+                                  padding: presentation.padding,
+                                },
+                              ]}
+                              onPress={() => handleDayPress(date, index, pageDates)}
+                            >
+                              <Text
+                                style={[
+                                  isSelected
+                                    ? styles.dateNumberActive
+                                    : styles.dateNumberInactive,
+                                  { fontSize: presentation.numberFontSize },
+                                ]}
+                              >
+                                {date.getDate()}
+                              </Text>
+                              {presentation.showDayLabel ? (
+                                <Text
+                                  style={
+                                    isSelected
+                                      ? styles.dayNameActive
+                                      : styles.dayNameInactive
+                                  }
+                                >
+                                  {getDayName(date.getDay(), !isSelected)}
+                                </Text>
+                              ) : null}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </Animated.View>
+                  );
+                }}
+              />
+            </Animated.View>
+          </Animated.View>
         </View>
         <TabFilterBar
           tabs={tabs}
@@ -324,7 +418,11 @@ export default function Dashboard() {
             <ActivityIndicator size="large" color="#B902D6" />
           </View>
         ) : filteredSchedules.length > 0 ? (
-          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
+          <ScrollView
+            style={{ flex: 1, paddingHorizontal: 16 }}
+            onScroll={handleContentScroll}
+            scrollEventThrottle={16}
+          >
             {filteredSchedules.map((schedule) => (
               <MedicationCard
                 key={schedule.id}
@@ -344,7 +442,11 @@ export default function Dashboard() {
             ))}
           </ScrollView>
         ) : activeTab === "medication" && allMedications.length > 0 ? (
-          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
+          <ScrollView
+            style={{ flex: 1, paddingHorizontal: 16 }}
+            onScroll={handleContentScroll}
+            scrollEventThrottle={16}
+          >
             {allMedications.map((med) => (
               <MedicationCard
                 key={med.id}

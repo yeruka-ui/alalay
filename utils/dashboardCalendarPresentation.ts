@@ -14,7 +14,8 @@ type CalendarDayPresentation = {
   showDayLabel: boolean;
 };
 
-const COLLAPSED_DAY_SIZE = 40;
+export const COLLAPSED_DAY_SIZE = 58;
+export const COLLAPSED_SELECTED_DAY_HEIGHT = 58;
 
 export function getCalendarDayPresentation({
   isCollapsed,
@@ -23,6 +24,17 @@ export function getCalendarDayPresentation({
   inactiveCardWidth,
 }: CalendarDayPresentationInput): CalendarDayPresentation {
   if (isCollapsed) {
+    if (isSelected) {
+      return {
+        width: activeCardWidth,
+        height: COLLAPSED_SELECTED_DAY_HEIGHT,
+        borderRadius: COLLAPSED_SELECTED_DAY_HEIGHT / 2,
+        padding: 0,
+        numberFontSize: 18,
+        showDayLabel: false,
+      };
+    }
+
     return {
       width: COLLAPSED_DAY_SIZE,
       height: COLLAPSED_DAY_SIZE,
