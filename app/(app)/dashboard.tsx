@@ -12,7 +12,6 @@ import {
   isSameDay,
   startOfDay,
 } from "@/utils/dashboardCalendar";
-import { getNextCalendarCollapsedState } from "@/utils/dashboardCalendarCollapse";
 import {
   getCalendarDayAnimationMode,
   type CalendarDayAnimationMode,
@@ -33,21 +32,18 @@ import {
   Animated as RNAnimated,
   Easing,
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Platform,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
 import Animated, {
-  Easing as ReanimatedEasing,
   interpolate,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
-  withTiming,
   type SharedValue,
 } from "react-native-reanimated";
 import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
@@ -61,7 +57,8 @@ const DAY_BATCH_CENTER_INDEX = Math.floor(DAY_BATCH_SIZE / 2);
 const CALENDAR_RECENTER_ANIMATION_MS = 300;
 const CALENDAR_EXPANDED_HEIGHT = 160;
 const CALENDAR_COLLAPSED_HEIGHT = COLLAPSED_SELECTED_DAY_HEIGHT + 16;
-const CALENDAR_COLLAPSE_ANIMATION_MS = 300;
+const CALENDAR_COLLAPSE_SCROLL_DISTANCE =
+  CALENDAR_EXPANDED_HEIGHT - CALENDAR_COLLAPSED_HEIGHT;
 const PURPLE_PANEL_EXPANDED_PADDING_BOTTOM = 35;
 const PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM = 18;
 const DAY_LABEL_EXPANDED_MARGIN_TOP = 4;
@@ -350,10 +347,19 @@ export default function Dashboard() {
   const carouselRef = useRef<ICarouselInstance>(null);
   const shouldResetCarouselRef = useRef(false);
   const pendingTransitionOffsetRef = useRef(0);
-  const previousScrollOffsetYRef = useRef(0);
   const calendarTranslateX = useRef(new RNAnimated.Value(0)).current;
-  const calendarCollapseProgress = useSharedValue(0);
-  const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(false);
+  const scrollOffsetY = useSharedValue(0);
+  const calendarCollapseProgress = useDerivedValue(() => {
+    if (scrollOffsetY.value <= 0) {
+      return 0;
+    }
+
+    if (scrollOffsetY.value >= CALENDAR_COLLAPSE_SCROLL_DISTANCE) {
+      return 1;
+    }
+
+    return scrollOffsetY.value / CALENDAR_COLLAPSE_SCROLL_DISTANCE;
+  });
   const pageOffsets = useMemo(
     () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
     [],
@@ -560,34 +566,12 @@ export default function Dashboard() {
       },
     ],
   }));
-
-  useEffect(() => {
-    calendarCollapseProgress.value = withTiming(
-      isCalendarCollapsed ? 1 : 0,
-      {
-        duration: CALENDAR_COLLAPSE_ANIMATION_MS,
-        easing: ReanimatedEasing.out(ReanimatedEasing.cubic),
-      },
-    );
-  }, [calendarCollapseProgress, isCalendarCollapsed]);
-
-  const handleContentScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const currentOffsetY = event.nativeEvent.contentOffset.y;
-      const nextCollapsedState = getNextCalendarCollapsedState({
-        currentOffsetY,
-        previousOffsetY: previousScrollOffsetYRef.current,
-        isCollapsed: isCalendarCollapsed,
-      });
-
-      previousScrollOffsetYRef.current = currentOffsetY;
-
-      if (nextCollapsedState !== isCalendarCollapsed) {
-        setIsCalendarCollapsed(nextCollapsedState);
-      }
+  const handleContentScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const currentOffsetY = event.contentOffset.y;
+      scrollOffsetY.value = currentOffsetY > 0 ? currentOffsetY : 0;
     },
-    [isCalendarCollapsed],
-  );
+  });
 
   return (
     <>
@@ -690,7 +674,7 @@ export default function Dashboard() {
             <ActivityIndicator size="large" color="#B902D6" />
           </View>
         ) : filteredSchedules.length > 0 ? (
-          <ScrollView
+          <Animated.ScrollView
             style={{ flex: 1, paddingHorizontal: 16 }}
             onScroll={handleContentScroll}
             scrollEventThrottle={16}
@@ -712,9 +696,9 @@ export default function Dashboard() {
                 }}
               />
             ))}
-          </ScrollView>
+          </Animated.ScrollView>
         ) : activeTab === "medication" && allMedications.length > 0 ? (
-          <ScrollView
+          <Animated.ScrollView
             style={{ flex: 1, paddingHorizontal: 16 }}
             onScroll={handleContentScroll}
             scrollEventThrottle={16}
@@ -731,7 +715,7 @@ export default function Dashboard() {
                 }}
               />
             ))}
-          </ScrollView>
+          </Animated.ScrollView>
         ) : (
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
