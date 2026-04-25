@@ -75,16 +75,13 @@ export default function Dashboard() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchSchedules = useCallback(async () => {
+    setSchedules([]);
     setIsLoadingData(true);
     setFetchError(null);
     try {
-      const [schedulesData, medsData] = await Promise.all([
-        getSchedulesForDate(selectedDate),
-        getActiveMedications(),
-      ]);
+      const schedulesData = await getSchedulesForDate(selectedDate);
       setSchedules(schedulesData);
-      setAllMedications(medsData);
     } catch (err) {
       const isAuthError =
         err instanceof Error &&
@@ -93,7 +90,7 @@ export default function Dashboard() {
       setFetchError(
         isAuthError
           ? "Your session expired. Please log in again."
-          : "Could not load data. Pull to retry."
+          : "Could not load data. Pull to retry.",
       );
     } finally {
       setIsLoadingData(false);
@@ -101,8 +98,14 @@ export default function Dashboard() {
   }, [selectedDate]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    fetchSchedules();
+  }, [fetchSchedules]);
+
+  useEffect(() => {
+    getActiveMedications().then(setAllMedications).catch(() => {});
+  }, []);
+
+  const fetchDashboardData = fetchSchedules;
 
   // Filter data based on active tab
   const filteredSchedules = schedules.filter((s) => {
@@ -319,11 +322,10 @@ export default function Dashboard() {
         )}
 
         {/* Medication Schedule List */}
-        {isLoadingData ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#B902D6" />
-          </View>
-        ) : filteredSchedules.length > 0 ? (
+        {isLoadingData && (
+          <ActivityIndicator size="small" color="#B902D6" style={{ marginVertical: 8 }} />
+        )}
+        {filteredSchedules.length > 0 ? (
           <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
             {filteredSchedules.map((schedule) => (
               <MedicationCard
@@ -358,11 +360,11 @@ export default function Dashboard() {
               />
             ))}
           </ScrollView>
-        ) : (
+        ) : !isLoadingData ? (
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />

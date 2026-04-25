@@ -12,10 +12,10 @@ import { toDbTime } from "./timeFormat";
 
 export async function getCurrentUserId(): Promise<string> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-  return user.id;
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  return session.user.id;
 }
 
 // ─── Prescriptions & Medications ─────────────────────────────
@@ -25,18 +25,24 @@ export async function savePrescription(
   imagePath?: string,
   rawOcrText?: string,
   source: "camera" | "gallery" | "manual" = "camera",
-  startDate: Date = new Date()
+  startDate: Date = new Date(),
 ): Promise<{ prescription: Prescription; medications: Medication[] }> {
   const userId = await getCurrentUserId();
 
   // Insert prescription
   const { data: prescription, error: rxError } = await supabase
     .from("prescriptions")
-    .insert({ user_id: userId, image_path: imagePath, raw_ocr_text: rawOcrText, source })
+    .insert({
+      user_id: userId,
+      image_path: imagePath,
+      raw_ocr_text: rawOcrText,
+      source,
+    })
     .select()
     .single();
 
-  if (rxError || !prescription) throw rxError ?? new Error("Failed to insert prescription");
+  if (rxError || !prescription)
+    throw rxError ?? new Error("Failed to insert prescription");
 
   // Insert medications
   const medicationRows = medications.map((med) => ({
@@ -60,8 +66,8 @@ export async function savePrescription(
   // Create schedule rows for the next 7 days starting from startDate
   await Promise.all(
     (savedMeds ?? []).map((med) =>
-      createSchedulesForMedication(med.id, startDate, 7)
-    )
+      createSchedulesForMedication(med.id, med.time ?? null, userId, startDate, 7),
+    ),
   );
 
   return { prescription, medications: savedMeds ?? [] };
@@ -84,7 +90,7 @@ export async function getActiveMedications(): Promise<Medication[]> {
 // ─── Medication Schedules ────────────────────────────────────
 
 export async function getSchedulesForDate(
-  date: Date
+  date: Date,
 ): Promise<(MedicationSchedule & { medication: Medication })[]> {
   const userId = await getCurrentUserId();
   const dateStr = date.toISOString().split("T")[0];
@@ -102,7 +108,7 @@ export async function getSchedulesForDate(
 
 export async function updateScheduleStatus(
   scheduleId: number,
-  status: "taken" | "missed" | "skipped"
+  status: "taken" | "missed" | "skipped",
 ): Promise<void> {
   const { error } = await supabase
     .from("medication_schedules")
@@ -117,17 +123,11 @@ export async function updateScheduleStatus(
 
 export async function createSchedulesForMedication(
   medicationId: number,
+  medicationTime: string | null,
+  userId: string,
   startDate: Date,
-  days: number = 7
+  days: number = 7,
 ): Promise<void> {
-  const userId = await getCurrentUserId();
-
-  const { data: med } = await supabase
-    .from("medications")
-    .select("time")
-    .eq("id", medicationId)
-    .single();
-
   const rows = [];
   for (let i = 0; i < days; i++) {
     const d = new Date(startDate);
@@ -136,7 +136,7 @@ export async function createSchedulesForMedication(
       medication_id: medicationId,
       user_id: userId,
       scheduled_date: d.toISOString().split("T")[0],
-      scheduled_time: med?.time ?? null,
+      scheduled_time: medicationTime,
     });
   }
 
@@ -150,7 +150,7 @@ export async function saveMedicalRecord(
   recordType: "prescription" | "lab_result" | "medical_id" | "other",
   filePath: string,
   title?: string,
-  notes?: string
+  notes?: string,
 ): Promise<MedicalRecord> {
   const userId = await getCurrentUserId();
 
@@ -171,7 +171,7 @@ export async function saveMedicalRecord(
 }
 
 export async function getMedicalRecords(
-  recordType?: string
+  recordType?: string,
 ): Promise<MedicalRecord[]> {
   const userId = await getCurrentUserId();
 
@@ -195,7 +195,7 @@ export async function getMedicalRecords(
 export async function uploadFile(
   bucket: "prescriptions" | "medical-records",
   fileUri: string,
-  fileName: string
+  fileName: string,
 ): Promise<string> {
   const userId = await getCurrentUserId();
   const filePath = `${userId}/${Date.now()}-${fileName}`;
@@ -214,7 +214,7 @@ export async function uploadFile(
 export async function getSignedUrlFor(
   bucket: "prescriptions" | "medical-records",
   path: string,
-  expiresIn: number = 60 * 5
+  expiresIn: number = 60 * 5,
 ): Promise<string> {
   const { data, error } = await supabase.storage
     .from(bucket)
