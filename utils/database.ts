@@ -4,6 +4,7 @@ import type {
   Medication,
   MedicationSchedule,
   Prescription,
+  ProfileUpdate,
 } from "@/types/database";
 import { supabase } from "./supabase";
 import { toDbTime } from "./timeFormat";
@@ -16,6 +17,38 @@ export async function getCurrentUserId(): Promise<string> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   return user.id;
+}
+
+// ─── Profile / Onboarding ────────────────────────────────────
+
+export async function checkOnboardingComplete(): Promise<boolean> {
+  try {
+    const userId = await getCurrentUserId();
+    const { data } = await supabase
+      .from("profiles")
+      .select("onboarding_complete")
+      .eq("auth_id", userId)
+      .maybeSingle();
+    return data?.onboarding_complete ?? false;
+  } catch {
+    return false;
+  }
+}
+
+export async function upsertOnboardingStep(updates: ProfileUpdate): Promise<void> {
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ auth_id: userId, ...updates }, { onConflict: "auth_id" });
+  if (error) throw error;
+}
+
+export async function markOnboardingComplete(): Promise<void> {
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ auth_id: userId, onboarding_complete: true }, { onConflict: "auth_id" });
+  if (error) throw error;
 }
 
 // ─── Prescriptions & Medications ─────────────────────────────
