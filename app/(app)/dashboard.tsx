@@ -14,6 +14,10 @@ import {
 } from "@/utils/dashboardCalendar";
 import { getNextCalendarCollapsedState } from "@/utils/dashboardCalendarCollapse";
 import {
+  getCalendarDayAnimationMode,
+  type CalendarDayAnimationMode,
+} from "@/utils/dashboardCalendarAnimationMode";
+import {
   COLLAPSED_SELECTED_DAY_HEIGHT,
   getCalendarDayPresentation,
 } from "@/utils/dashboardCalendarPresentation";
@@ -71,6 +75,7 @@ type CalendarDayCardProps = {
   collapseProgress: SharedValue<number>;
   activeCardWidth: number;
   inactiveCardWidth: number;
+  animationMode: CalendarDayAnimationMode;
   onPress: () => void;
 };
 
@@ -81,6 +86,7 @@ function CalendarDayCard({
   collapseProgress,
   activeCardWidth,
   inactiveCardWidth,
+  animationMode,
   onPress,
 }: CalendarDayCardProps) {
   const expandedPresentation = getCalendarDayPresentation({
@@ -153,6 +159,115 @@ function CalendarDayCard({
       },
     ],
   }));
+  const expandedFadeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(collapseProgress.value, [0, 1], [1, 0]),
+  }));
+  const collapsedFadeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(collapseProgress.value, [0, 1], [0, 1]),
+  }));
+
+  if (animationMode === "fade") {
+    return (
+      <AnimatedTouchableOpacity
+        style={[
+          {
+            width: expandedPresentation.width,
+            height: expandedPresentation.height,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+        ]}
+        onPress={onPress}
+      >
+        <Animated.View
+          renderToHardwareTextureAndroid
+          shouldRasterizeIOS
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              inset: 0,
+              alignItems: "center",
+              justifyContent: "center",
+            },
+            expandedFadeAnimatedStyle,
+          ]}
+        >
+          <View
+            style={[
+              isSelected ? styles.activeCard : styles.inactiveCard,
+              {
+                width: expandedPresentation.width,
+                height: expandedPresentation.height,
+                borderRadius: expandedPresentation.borderRadius,
+                padding: expandedPresentation.padding,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                isSelected
+                  ? styles.dateNumberActive
+                  : styles.dateNumberInactive,
+                { fontSize: expandedPresentation.numberFontSize },
+              ]}
+            >
+              {date.getDate()}
+            </Text>
+            {expandedPresentation.showDayLabel ? (
+              <Text
+                style={[
+                  isSelected
+                    ? styles.dayNameActive
+                    : styles.dayNameInactive,
+                  { marginTop: DAY_LABEL_EXPANDED_MARGIN_TOP },
+                ]}
+              >
+                {dayLabel}
+              </Text>
+            ) : null}
+          </View>
+        </Animated.View>
+        <Animated.View
+          renderToHardwareTextureAndroid
+          shouldRasterizeIOS
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              inset: 0,
+              alignItems: "center",
+              justifyContent: "center",
+            },
+            collapsedFadeAnimatedStyle,
+          ]}
+        >
+          <View
+            style={[
+              isSelected ? styles.activeCard : styles.inactiveCard,
+              {
+                width: collapsedPresentation.width,
+                height: collapsedPresentation.height,
+                borderRadius: collapsedPresentation.borderRadius,
+                padding: collapsedPresentation.padding,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                isSelected
+                  ? styles.dateNumberActive
+                  : styles.dateNumberInactive,
+                { fontSize: collapsedPresentation.numberFontSize },
+              ]}
+            >
+              {date.getDate()}
+            </Text>
+          </View>
+        </Animated.View>
+      </AnimatedTouchableOpacity>
+    );
+  }
 
   return (
     <AnimatedTouchableOpacity
@@ -414,6 +529,7 @@ export default function Dashboard() {
     inactiveCardWidth,
     collapsedDaySize: inactiveCardWidth,
   });
+  const calendarDayAnimationMode = getCalendarDayAnimationMode(Platform.OS);
   const purplePanelAnimatedStyle = useAnimatedStyle(() => ({
     minHeight: 0,
     paddingBottom: interpolate(
@@ -541,6 +657,7 @@ export default function Dashboard() {
                                 collapseProgress={calendarCollapseProgress}
                                 activeCardWidth={activeCardWidth}
                                 inactiveCardWidth={inactiveCardWidth}
+                                animationMode={calendarDayAnimationMode}
                                 onPress={() => handleDayPress(date, index, pageDates)}
                               />
                             );
