@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Platform } from "react-native";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
 const authStorage =
   Platform.OS === "web" && typeof window === "undefined"

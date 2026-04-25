@@ -2,9 +2,19 @@ export type Profile = {
   id: number;
   auth_id: string;
   full_name: string | null;
+  birth_date: string | null;
+  health_conditions: string[] | null;
+  onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
 };
+
+export type ProfileUpdate = Partial<
+  Pick<
+    Profile,
+    "full_name" | "birth_date" | "health_conditions" | "onboarding_complete"
+  >
+>;
 
 export type Prescription = {
   id: number;
@@ -53,6 +63,12 @@ export type MedicalRecord = {
 
 // Insert types (omit auto-generated fields)
 export type PrescriptionInsert = Omit<Prescription, "id" | "created_at">;
-export type MedicationInsert = Omit<Medication, "id" | "created_at" | "updated_at" | "is_active">;
-export type MedicationScheduleInsert = Omit<MedicationSchedule, "id" | "created_at" | "status" | "taken_at">;
+export type MedicationInsert = Omit<
+  Medication,
+  "id" | "created_at" | "updated_at" | "is_active"
+>;
+export type MedicationScheduleInsert = Omit<
+  MedicationSchedule,
+  "id" | "created_at" | "status" | "taken_at"
+>;
 export type MedicalRecordInsert = Omit<MedicalRecord, "id" | "created_at">;
