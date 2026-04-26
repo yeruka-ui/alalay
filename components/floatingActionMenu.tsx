@@ -88,9 +88,9 @@ export default function FloatingActionMenu({ actions }: Props) {
   // - Document: middle-left (left and above main button)
   // - Camera: bottom-left (left of main button)
   const buttonPositions = [
-    { translateX: -80, translateY: -10 }, // camera — bottom-left
-    { translateX: -60, translateY: -80 }, // document — middle-left
-    { translateX: 10, translateY: -90 }, // mic — top-right area
+    { translateX: -80, translateY: -30 }, // camera — bottom-left
+    { translateX: 0, translateY: -80 }, // document — middle-left
+    { translateX: 80, translateY: -30 }, // mic — top-right area
   ];
 
   return (
@@ -183,12 +183,14 @@ const styles = StyleSheet.create({
     zIndex: 998,
   },
   container: {
-    position: "absolute",
-    bottom: 40,
-    right: 30,
+    // position: "absolute",
+    bottom: 30,
+    right: 0,
+    left: 0,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 999,
+    // height: 30,
   },
   mainButton: {
     width: 60,
