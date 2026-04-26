@@ -1,3 +1,4 @@
+import AddMedicationWidget from "@/components/AddMedicationWidget";
 import FloatingActionMenu from "@/components/floatingActionMenu";
 import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
@@ -343,6 +344,7 @@ export default function Dashboard() {
     getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAddMedOpen, setIsAddMedOpen] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
   const carouselRef = useRef<ICarouselInstance>(null);
   const shouldResetCarouselRef = useRef(false);
@@ -598,7 +600,7 @@ export default function Dashboard() {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.purpleButton}>
+              <TouchableOpacity style={styles.purpleButton} onPress={() => setIsAddMedOpen(true)}>
                 <Text style={styles.addTaskText}>+ Add Task</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -727,6 +729,7 @@ export default function Dashboard() {
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />
+        <AddMedicationWidget visible={isAddMedOpen} onClose={() => setIsAddMedOpen(false)} />
       </View>
 
       {/* iOS: native spinner inside a slide-up modal with a Done button */}
