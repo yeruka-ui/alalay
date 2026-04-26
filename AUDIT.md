@@ -10,15 +10,36 @@
 
 | Category | Status | Score |
 |---|---|---|
-| Security | 🔴 Critical issues | 3/10 |
-| Functionality | 🟠 Broken flows | 4/10 |
-| Architecture | 🟢 Refactored | 8/10 |
-| Code Quality | 🔴 Significant debt | 5/10 |
+| Security | 🟡 Remaining: PHI, weak pw, no magic link | 6/10 |
+| Functionality | 🟡 Core flows working; minor UX gaps remain | 7/10 |
+| Architecture | 🟢 Refactored + notifications | 8/10 |
+| Code Quality | 🟡 Moderate debt | 6/10 |
 | Test Coverage | 🔴 None | 0/10 |
 
 ---
 
 ## Recent Changes
+
+### 2026-04-26 — Phase 0 Core Flows Complete + Local Notifications (T-001, T-002, T-021)
+
+✅ **T-001 / BUG-01 fixed:** Voice flow (`app/(app)/talk_to_alalay.tsx`) now calls `savePrescription` with loading state, error handling, and start date picker. File also moved into `(app)` route group.  
+✅ **T-002 / BUG-02 fixed:** `savePrescription` now calls `createSchedulesForMedication` for each medication (7 days from user-selected start date). UTC date bug fixed: all date strings now use `manilaDateString()` from `utils/manilaTime.ts`.  
+✅ **T-021 done:** Local `expo-notifications` system fully wired — see `utils/notifications.ts`:
+- Android high-importance channel (`medication-reminders`) + TAKE/SNOOZE category buttons
+- Notifications scheduled on `savePrescription`, cancelled on Take/Skip via `markScheduleStatus`
+- `syncAllPendingNotifications` re-syncs on login (idempotent via `notification_id` column)
+- `app/_layout.tsx`: configures channel + syncs once per authenticated session; handles SNOOZE (reschedule +10min) and TAKE (navigate to dashboard) responses
+- Permission requested in `(onboarding)/done.tsx`
+- `supabase/migration.sql` section 12: `notification_id text` column on `medication_schedules`  
+✅ **SEC-04 / T-010 fixed:** All RLS policies now have explicit `with check` clauses (migration section 11).  
+✅ **SEC-05 / T-011 fixed:** All `TextInput` fields have `maxLength` (name: 200, dosage/time: 50, instructions: 500, notes: 1000).  
+✅ **SEC-07 / T-040 fixed:** All `console.log` calls with PII removed from auth screens.  
+✅ **BUG-09 / T-034 fixed:** Forgot-password validates email, shows success banner, adds `redirectTo`, removes PII log.  
+✅ **T-008 fixed:** React error boundary (`AppErrorBoundary`) wraps root `<Slot/>`.  
+✅ **DEBT-04 / T-009 fixed:** `setTimeout` in dashboard replaced with `useRef`-tracked timeout with cleanup.  
+✅ **T-006 fixed:** Auth errors distinguished from empty-data in dashboard and record locker — separate error messages per case.
+
+---
 
 ### 2026-04-23 — SEC-02 / T-003 (Storage path-in-DB, sign-on-read)
 
@@ -104,7 +125,7 @@
 
 - **Zero test files** — no unit, integration, or E2E tests exist. No test runner configured.
 - **No CI/CD pipeline** — no GitHub Actions or Expo EAS build configuration.
-- **No error boundaries** — a single component crash propagates to a white screen.
+- ~~**No error boundaries**~~ — ✅ Fixed (T-008): `AppErrorBoundary` wraps root slot.
 
 ---
 
@@ -134,26 +155,15 @@ Prescription images, raw OCR text, and medication names are PHI (Protected Healt
 
 ---
 
-### SEC-04 — No `with check` on RLS INSERT Policies
-**CVSS: 3.1 (Low)**
+### ~~SEC-04~~ — No `with check` on RLS INSERT Policies ✅ Fixed 2026-04-26 (T-010)
 
-All RLS policies use `for all … using (user_id = auth.uid())` without an explicit `with check`. PostgreSQL defaults `with check` to the `using` expression for INSERT/UPDATE, so this is functionally correct today, but fragile.
-
-**Fix:** Add explicit `with check` clauses to all `for all` policies.
+All five table RLS policies now have explicit `with check (user_id = auth.uid())` or `auth_id` equivalent. Migration section 11.
 
 ---
 
-### SEC-05 — No Input Length Validation on TextInput Fields
-**CVSS: 2.9 (Low)**
+### ~~SEC-05~~ — No Input Length Validation on TextInput Fields ✅ Fixed 2026-04-26 (T-011)
 
-`TextInput` fields for medication name, dosage, instructions, and time have no `maxLength`. A user could submit multi-MB strings, causing oversized Supabase inserts.
-
-```tsx
-// MedicationCard.tsx:153, prescription_camera.tsx:395
-<TextInput value={draft.name} onChangeText={...} />
-```
-
-**Fix:** Add `maxLength` props (e.g., 200 for name, 50 for dosage/time, 500 for instructions).
+`maxLength` added to all `TextInput` fields: name 200, dosage/time 50, instructions 500, notes 1000.
 
 ---
 
@@ -161,17 +171,9 @@ All RLS policies use `for all … using (user_id = auth.uid())` without an expli
 
 ---
 
-### SEC-07 — PII Logged to Device Console
-**CVSS: 3.5 (Low)**
+### ~~SEC-07~~ — PII Logged to Device Console ✅ Fixed 2026-04-26 (T-040)
 
-`login.tsx:72` logs the user's email address:
-
-```ts
-console.log("Forgot password pressed", email); // ← PII
-```
-
-`login.tsx:210` and `signup.tsx:50` also log navigation timing. On Android, device logs are accessible to other apps with `READ_LOGS` permission in debug builds.  
-**Fix:** Remove all `console.log` calls containing user data. Tracked as T-040.
+All `console.log` calls with PII (`email`, navigation timing) removed from `login.tsx` and `signup.tsx`.
 
 ---
 
@@ -195,31 +197,15 @@ console.log("Forgot password pressed", email); // ← PII
 
 ## Functional Bugs
 
-### BUG-01 — "Add to Alalay" in `talk_to_alalay.tsx` Does Not Save
-**Severity: Critical**
+### ~~BUG-01~~ — "Add to Alalay" in `talk_to_alalay.tsx` Does Not Save ✅ Fixed 2026-04-26 (T-001)
 
-The voice flow correctly records audio, sends it to Gemini, and parses medications — but pressing "Add to Alalay" shows an alert and navigates back without persisting anything.
-
-```ts
-// talk_to_alalay.tsx:260-263
-const handleAddToAlalay = () => {
-  Alert.alert("Added!", "Your medications have been added to Alalay.", [
-    { text: "OK", onPress: () => router.back() },
-  ]);
-  // ← savePrescription() is never called
-};
-```
-
-**Fix:** Call `savePrescription(medications, undefined, undefined, "manual")` before navigating back.
+`app/(app)/talk_to_alalay.tsx` now calls `savePrescription(medications, undefined, undefined, "manual", startDate)` with loading state, error handling, and a start date picker.
 
 ---
 
-### BUG-02 — `createSchedulesForMedication` Never Called
-**Severity: High**
+### ~~BUG-02~~ — `createSchedulesForMedication` Never Called ✅ Fixed 2026-04-26 (T-002)
 
-`utils/database.ts` defines `createSchedulesForMedication()` (line 109) which is never imported or called. Medications are saved but schedules are never created — dashboard schedule view is always empty for newly added medications.
-
-**Fix:** Call `createSchedulesForMedication()` inside `savePrescription()` for each saved medication after the medications insert succeeds.
+`savePrescription` now calls `createSchedulesForMedication` for each saved medication (7 days from start date) and schedules a local notification per future row.
 
 ---
 
@@ -246,22 +232,9 @@ Dashboard has an "appointments" tab with `id: "appointments"` but no filter logi
 
 ---
 
-### BUG-09 — Forgot Password Has No UX or Error Handling
-**Severity: Medium**
+### ~~BUG-09~~ — Forgot Password Had No UX or Error Handling ✅ Fixed 2026-04-26 (T-034)
 
-`handleForgotPassword` (`login.tsx:67-73`) has no email validation, no `redirectTo` URI, no success/error UI, and logs the email to the console (PII).
-
-```ts
-async function handleForgotPassword() {
-  const { supabase } = await import("@/utils/supabase");
-  if (email) {
-    await supabase.auth.resetPasswordForEmail(email); // no redirectTo
-  }
-  console.log("Forgot password pressed", email); // ← PII log
-}
-```
-
-**Fix:** Validate `EMAIL_REGEX.test(email)`. Add `redirectTo: "alalay://auth/reset-password"`. Show success/error banner. Remove `console.log`. Tracked as T-034.
+Email validated, `redirectTo: "alalay://auth/reset-password"` added, success banner shown, PII log removed.
 
 ---
 
@@ -294,12 +267,9 @@ Single implementation in `supabase/functions/_shared/gemini.ts`. Both client cop
 ### DEBT-03 — Inline Style Objects in Dashboard JSX
 `dashboard.tsx` lines 257–295, 307–326 define many styles inline, creating new object references every render. Should move to `StyleSheet.create()`.
 
-### DEBT-04 — `setTimeout` Without Cleanup in Dashboard
-```ts
-// dashboard.tsx:167
-setTimeout(() => scrollToDate(...), 100);
-```
-No `clearTimeout` on unmount. Tracked as T-009.
+### ~~DEBT-04~~ — `setTimeout` Without Cleanup in Dashboard ✅ Fixed 2026-04-26 (T-009)
+
+Timeout stored in `useRef`; cleared in `useEffect` cleanup.
 
 ### DEBT-05 — `getActiveMedications` Fetched on Every Date Change
 Date-independent data fetched inside `fetchDashboardData` which runs on every `selectedDate` change. Should be fetched once on mount.

@@ -14,7 +14,7 @@ Alalay is a prescription management mobile app built with Expo (React Native) an
 
 ## Architecture
 
-**File-based routing** via expo-router with **route groups** partitioning public vs. protected screens:
+**File-based routing** via expo-router with **route groups** partitioning public vs. protected vs. onboarding screens:
 
 ```
 app/
@@ -25,22 +25,29 @@ app/
     onboard.tsx            # Landing page — Sign in / Create Account CTAs
     login.tsx              # Email/password login (magic link NOT yet implemented — see T-046)
     signup.tsx             # Account creation (name, email, password, role)
+  (onboarding)/
+    _layout.tsx            # Stack (animation: slide_from_right)
+    step1.tsx              # Full name input
+    step2.tsx              # Date of birth picker
+    step3.tsx              # Health conditions
+    done.tsx               # Completion + notification permission request
   (app)/
     _layout.tsx            # Stack with no header
-    dashboard.tsx          # Main screen with calendar + medication schedule
+    dashboard.tsx          # Main screen with animated calendar + medication schedule
     prescription_camera.tsx # Camera/gallery → Gemini OCR → editable medication cards
     record_locker.tsx      # Saved medications browser
     alalay_chat.tsx        # Chat interface (placeholder)
-    talk_to_alalay.tsx     # Voice interaction screen
+    talk_to_alalay.tsx     # Voice → Gemini → medication cards → savePrescription
 ```
 
 **Auth Guard (root `_layout.tsx`):**
 - Observes `supabase.auth.onAuthStateChange` for live session tracking
-- Uses `useSegments()` to identify current route group (`"(auth)"` or `"(app)"`)
-- Redirects based on session state: unauthenticated users → `/onboard`, authenticated → `/dashboard`
-- `getSession()` resolves on cold start before first redirect decision
-- Route groups are URL-invisible; all hrefs (`/login`, `/dashboard`, `/record_locker`, …) remain stable
-- **Known issue (BUG-12 / T-031):** `<Slot/>` renders unconditionally — not gated on `ready`. Authenticated users see a brief flash of the onboard screen on cold start until T-031 is fixed. `segments` in the guard deps array is also a new array reference each render.
+- Uses `useSegments()` to identify current route group (`"(auth)"`, `"(onboarding)"`, or `"(app)"`)
+- Redirects: unauthenticated → `/onboard`; authenticated + onboarding incomplete → `/(onboarding)/step1`; authenticated + done → `/dashboard`
+- `getSession()` + `checkOnboardingComplete()` resolve before first redirect
+- Route groups are URL-invisible; all hrefs (`/login`, `/dashboard`, …) remain stable
+- Also: configures notifications channel, syncs pending notification IDs, registers TAKE/SNOOZE response listener once per authenticated session
+- **Known issue (BUG-12 / T-031):** `<Slot/>` renders unconditionally — not gated on `ready`. Authenticated users see a brief flash of the onboard screen on cold start until T-031 is fixed.
 
 **Key data flow for prescription OCR:**
 `Image capture → base64 → supabase.functions.invoke("analyze-prescription") → Edge Function calls Gemini (server-side key) → parses JSON → returns MedicationItem[] → fuzzy validation (medicationValidator) → MedicationCard list`
@@ -59,10 +66,10 @@ app/
 **Database schema** defined in `supabase/migration.sql`. Tables: `profiles`, `prescriptions`, `medications`, `medication_schedules`, `medical_records`. All tables have RLS policies scoped to `auth.uid()`. Storage buckets: `prescriptions`, `medical-records`.
 
 **Key data flow for saving prescriptions:**
-`MedicationCard list → "Add to Alalay" → uploadFile() to Supabase Storage → savePrescription() inserts prescription + medications rows`
+`MedicationCard list → "Add to Alalay" → uploadFile() to Supabase Storage → savePrescription() inserts prescription + medications rows → createSchedulesForMedication() for 7 days → scheduleNotificationFor() per future row`
 
 **Dashboard data flow:**
-`selectedDate change → getSchedulesForDate() + getActiveMedications() → filtered by active tab → schedule cards with "Take" button → updateScheduleStatus()`
+`selectedDate change → getSchedulesForDate() + getActiveMedications() → filtered by active tab → schedule cards with "Take" button → markScheduleStatus() (DB update + notification cancel)`
 
 ## Key Files
 
@@ -81,7 +88,9 @@ app/
 | `utils/medicationValidator.ts` | fuse.js fuzzy match against known drug names |
 | `data/medicationDatabase.ts` | ~225 Philippine generic + brand medication names |
 | `utils/ai.ts` | AI proxy — `analyzePrescription` + `analyzeAudio` via Supabase Edge Functions |
-| `utils/database.ts` | CRUD helpers for Supabase (savePrescription, getSchedulesForDate, etc.) |
+| `utils/database.ts` | CRUD helpers: `savePrescription` (schedules + notifs), `getSchedulesForDate`, `markScheduleStatus` (DB + cancel notif), etc. |
+| `utils/manilaTime.ts` | Manila TZ helpers: `manilaDateString(d)` (fixes UTC date bug), `combineManilaDateTime(dateStr, timetz)` |
+| `utils/notifications.ts` | expo-notifications glue: channel setup, schedule/cancel/snooze per row, `syncAllPendingNotifications` |
 | `utils/supabase.ts` | Supabase client with AsyncStorage session persistence |
 | `utils/auth.ts` | Auth helpers (signInWithEmail, signUpWithEmail, saveRememberedIdentifier, getRememberedIdentifier). Note: drops `data` from responses — see DEBT-08 / T-038 |
 | `supabase/functions/analyze-prescription/index.ts` | Edge Function: verifies JWT via `auth.getUser()`, image → Gemini → MedicationItem[] |

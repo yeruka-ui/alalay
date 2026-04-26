@@ -20,7 +20,7 @@ import {
   COLLAPSED_SELECTED_DAY_HEIGHT,
   getCalendarDayPresentation,
 } from "@/utils/dashboardCalendarPresentation";
-import { getActiveMedications, getSchedulesForDate } from "@/utils/database";
+import { getActiveMedications, getSchedulesForDate, markScheduleStatus } from "@/utils/database";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,

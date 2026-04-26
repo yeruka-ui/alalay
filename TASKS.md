@@ -13,17 +13,15 @@
 
 ---
 
-### [T-001] Fix: Voice flow doesn't save medications
-**File:** `app/talk_to_alalay.tsx:260`  
-**Description:** `handleAddToAlalay` shows an alert and navigates back without calling `savePrescription`. Medications extracted via voice are lost.  
-**Success criteria:** Pressing "Add to Alalay" on the voice results screen calls `savePrescription(medications, undefined, undefined, "manual")`, handles errors with an Alert, and navigates back only on success.
+### [x] [T-001] Fix: Voice flow doesn't save medications
+**Fixed 2026-04-26**
+`app/(app)/talk_to_alalay.tsx` — `handleAddToAlalay` now calls `savePrescription(medications, undefined, undefined, "manual", startDate)` with proper error handling and loading state. Also added start date picker (matches prescription_camera UX).
 
 ---
 
-### [T-002] Fix: Schedules never created after prescription save
-**File:** `utils/database.ts:109`, called from `app/prescription_camera.tsx:277`  
-**Description:** `createSchedulesForMedication()` exists but is never called. The dashboard's schedule view is permanently empty for any user who scans a prescription.  
-**Success criteria:** `savePrescription()` calls `createSchedulesForMedication()` for each saved medication. Dashboard shows schedule entries for the day after a prescription is saved.
+### [x] [T-002] Fix: Schedules never created after prescription save
+**Fixed 2026-04-26**
+`utils/database.ts` — `savePrescription` now calls `createSchedulesForMedication` for each saved medication (7 days from `startDate`). Also schedules a local `expo-notifications` reminder per row via `scheduleNotificationFor`. UTC date bug fixed: all date strings now use `manilaDateString()` from `utils/manilaTime.ts`.
 
 ---
 
@@ -252,8 +250,16 @@
 ### [T-020] Add: Record viewer (image full-screen + PDF)
 Open tapped record in full-screen image viewer or WebView for PDFs.
 
-### [T-021] Add: Push notifications for medication schedules
-Store `expo_push_token` in `profiles`. Edge Function sends notification at `scheduled_time`.
+### [x] [T-021] Add: Local notifications for medication schedules
+**Done 2026-04-26** — Local `expo-notifications` system fully wired:
+- `utils/notifications.ts`: Android channel, TAKE/SNOOZE category, schedule/cancel/snooze/sync helpers
+- `utils/manilaTime.ts`: Manila TZ date arithmetic (`combineManilaDateTime`, `manilaDateString`)
+- `supabase/migration.sql` section 12: `notification_id text` column on `medication_schedules`
+- Notifications scheduled on `savePrescription`, cancelled on Take/Skip via `markScheduleStatus`
+- `app/_layout.tsx`: `configureNotifications` + `syncAllPendingNotifications` on login; snooze/take response handler
+- Permission requested in onboarding `done.tsx`
+
+**Remaining (separate task):** Push notifications via FCM/APNs — store `expo_push_token` in `profiles`, Edge Function sends push at `scheduled_time`. See T-021-push.
 
 ### [T-022] Add: Adherence analytics screen
 Adherence rate per medication, streak counter, per-day calendar heatmap.
