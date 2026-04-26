@@ -62,6 +62,16 @@ export type MedicalRecord = {
   created_at: string;
 };
 
+export type Appointment = {
+  id: number;
+  user_id: string;
+  name: string;
+  description: string | null;
+  appointment_date: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // Insert types (omit auto-generated fields)
 export type PrescriptionInsert = Omit<Prescription, "id" | "created_at">;
 export type MedicationInsert = Omit<

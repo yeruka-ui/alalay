@@ -729,7 +729,14 @@ export default function Dashboard() {
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />
-        <AddMedicationWidget visible={isAddMedOpen} onClose={() => setIsAddMedOpen(false)} />
+        <AddMedicationWidget
+          visible={isAddMedOpen}
+          onClose={() => setIsAddMedOpen(false)}
+          onSaved={() => {
+            setIsAddMedOpen(false);
+            fetchDashboardData();
+          }}
+        />
       </View>
 
       {/* iOS: native spinner inside a slide-up modal with a Done button */}
@@ -751,6 +758,8 @@ export default function Dashboard() {
               value={selectedDate}
               mode="date"
               display="spinner"
+              textColor="#000000"
+              themeVariant="light"
               onChange={(_: DateTimePickerEvent, date?: Date) => {
                 if (date) handleSelectedDateChange(date);
               }}

@@ -42,11 +42,21 @@ export async function configureNotifications(): Promise<void> {
   ]);
 }
 
+function hasNotificationPermission(
+  status: Awaited<ReturnType<typeof Notifications.getPermissionsAsync>>
+): boolean {
+  return (
+    status.granted ||
+    status.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  );
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
+  await configureNotifications();
   const existing = await Notifications.getPermissionsAsync();
-  if (existing.granted) return true;
+  if (hasNotificationPermission(existing)) return true;
   const result = await Notifications.requestPermissionsAsync();
-  return result.granted;
+  return hasNotificationPermission(result);
 }
 
 // ─── Types ───────────────────────────────────────────────────
@@ -161,3 +171,4 @@ export async function syncAllPendingNotifications(userId: string): Promise<void>
     }
   }
 }
+
