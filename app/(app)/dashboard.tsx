@@ -1,3 +1,4 @@
+import AddMedicationWidget from "@/components/AddMedicationWidget";
 import FloatingActionMenu from "@/components/floatingActionMenu";
 import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
@@ -343,6 +344,7 @@ export default function Dashboard() {
     getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAddMedOpen, setIsAddMedOpen] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
   const carouselRef = useRef<ICarouselInstance>(null);
   const shouldResetCarouselRef = useRef(false);
@@ -408,7 +410,7 @@ export default function Dashboard() {
   }, [fetchSchedules]);
 
   useEffect(() => {
-    getActiveMedications().then(setAllMedications).catch(() => {});
+    getActiveMedications().then(setAllMedications).catch(() => { });
   }, []);
 
   const fetchDashboardData = fetchSchedules;
@@ -598,7 +600,7 @@ export default function Dashboard() {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.purpleButton}>
+              <TouchableOpacity style={styles.purpleButton} onPress={() => setIsAddMedOpen(true)}>
                 <Text style={styles.addTaskText}>+ Add Task</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -723,10 +725,18 @@ export default function Dashboard() {
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
           </View>
-        ) : null}
+        )}
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />
+        <AddMedicationWidget
+          visible={isAddMedOpen}
+          onClose={() => setIsAddMedOpen(false)}
+          onSaved={() => {
+            setIsAddMedOpen(false);
+            fetchDashboardData();
+          }}
+        />
       </View>
 
       {/* iOS: native spinner inside a slide-up modal with a Done button */}
@@ -748,6 +758,8 @@ export default function Dashboard() {
               value={selectedDate}
               mode="date"
               display="spinner"
+              textColor="#000000"
+              themeVariant="light"
               onChange={(_: DateTimePickerEvent, date?: Date) => {
                 if (date) handleSelectedDateChange(date);
               }}

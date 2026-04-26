@@ -235,3 +235,25 @@ create policy medical_records_policy on public.medical_records
 -- ============================================================
 alter table public.medication_schedules
   add column if not exists notification_id text;
+
+-- ============================================================
+-- 13. APPOINTMENTS
+-- ============================================================
+create table if not exists public.appointments (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  description text,
+  appointment_date date not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.appointments enable row level security;
+
+create policy appointments_policy on public.appointments
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create index if not exists appointments_user_date_idx on public.appointments (user_id, appointment_date);

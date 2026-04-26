@@ -6,10 +6,11 @@ import type {
   Prescription,
   ProfileUpdate,
 } from "@/types/database";
-import { supabase } from "./supabase";
-import { toDbTime } from "./timeFormat";
+import type { FrequencyKind } from "./frequency";
 import { manilaDateString } from "./manilaTime";
 import { cancelNotificationFor, scheduleNotificationFor } from "./notifications";
+import { supabase } from "./supabase";
+import { toDbTime } from "./timeFormat";
 
 // ─── Auth Helpers ────────────────────────────────────────────
 
@@ -189,8 +190,8 @@ export async function markScheduleStatus(
 
 export async function createSchedulesForMedication(
   medicationId: number,
-  medicationTime: string | null,
-  userId: string,
+  // medicationTime: string | null,
+  // // userId: string,
   startDate: Date,
   days: number = 7
 ): Promise<MedicationSchedule[]> {
@@ -220,6 +221,94 @@ export async function createSchedulesForMedication(
     .select();
   if (error) throw error;
   return data ?? [];
+}
+
+// ─── Manual Medication + Appointment Save ────────────────────
+
+function expandDates(start: Date, end: Date, kind: FrequencyKind): string[] {
+  const dates: string[] = [];
+  const stepMs = (kind === "weekly" ? 7 : kind === "every-other-day" ? 2 : 1) * 86_400_000;
+  const endStr = manilaDateString(end);
+  let current = start.getTime();
+  for (let i = 0; i < 365; i++) {
+    const dateStr = manilaDateString(new Date(current));
+    dates.push(dateStr);
+    if (dateStr >= endStr) break;
+    current += stepMs;
+  }
+  return dates;
+}
+
+export async function saveManualMedication(params: {
+  name: string;
+  description: string | null;
+  intakeTimes: string[];
+  startDate: Date;
+  endDate: Date;
+  frequencyKind: FrequencyKind;
+}): Promise<Medication[]> {
+  const { name, description, intakeTimes, startDate, endDate, frequencyKind } = params;
+  const userId = await getCurrentUserId();
+  const dates = expandDates(startDate, endDate, frequencyKind);
+  const savedMeds: Medication[] = [];
+
+  for (const time of intakeTimes) {
+    const { data: med, error: medError } = await supabase
+      .from("medications")
+      .insert({
+        user_id: userId,
+        name,
+        instructions: description,
+        time,
+        is_active: true,
+        prescription_id: null,
+      })
+      .select()
+      .single();
+
+    if (medError || !med) throw medError ?? new Error("Failed to insert medication");
+    savedMeds.push(med);
+
+    const scheduleRows = dates.map((date) => ({
+      medication_id: med.id,
+      user_id: userId,
+      scheduled_date: date,
+      scheduled_time: time,
+    }));
+
+    const { data: schedules, error: schedError } = await supabase
+      .from("medication_schedules")
+      .insert(scheduleRows)
+      .select();
+
+    if (schedError) throw schedError;
+
+    await Promise.all(
+      (schedules ?? []).map((s) =>
+        scheduleNotificationFor({
+          ...s,
+          medication: { name: med.name, dosage: med.dosage, instructions: med.instructions },
+        })
+      )
+    );
+  }
+
+  return savedMeds;
+}
+
+export async function saveAppointment(params: {
+  name: string;
+  description: string | null;
+  date: Date;
+}): Promise<void> {
+  const userId = await getCurrentUserId();
+  const { error } = await supabase.from("appointments").insert({
+    user_id: userId,
+    name: params.name,
+    description: params.description,
+    appointment_date: manilaDateString(params.date),
+  });
+  if (error) throw error;
 }
 
 // ─── Medical Records ─────────────────────────────────────────

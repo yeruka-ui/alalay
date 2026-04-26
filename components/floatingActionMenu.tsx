@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -95,12 +96,14 @@ export default function FloatingActionMenu({ actions }: Props) {
 
   return (
     <>
-      {/* Dimmed overlay when menu is open */}
+      {/* Blurred overlay when menu is open */}
       <TouchableWithoutFeedback onPress={closeMenu}>
         <Animated.View
           pointerEvents={overlayActive ? "auto" : "none"}
           style={[styles.overlay, { opacity: progress }]}
-        />
+        >
+          <BlurView intensity={50} tint="light" style={StyleSheet.absoluteFill} />
+        </Animated.View>
       </TouchableWithoutFeedback>
 
       <View style={styles.container} pointerEvents="box-none">
@@ -179,7 +182,6 @@ export default function FloatingActionMenu({ actions }: Props) {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
     zIndex: 998,
   },
   container: {
