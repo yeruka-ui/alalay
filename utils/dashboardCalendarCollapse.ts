@@ -1,6 +1,8 @@
-const COLLAPSE_DELTA_THRESHOLD = 24;
-const EXPAND_DELTA_THRESHOLD = 16;
-const TOP_EXPAND_OFFSET = 20;
+import { Dimensions } from "react-native";
+const { height, width } = Dimensions.get("window");
+
+const COLLAPSE_DELTA_THRESHOLD = 16;
+const TOP_EXPAND_OFFSET = (height / 2) - 16;
 
 type CalendarCollapseStateInput = {
   currentOffsetY: number;
@@ -23,10 +25,6 @@ export function getNextCalendarCollapsedState({
 
   if (!isCollapsed && deltaY >= COLLAPSE_DELTA_THRESHOLD) {
     return true;
-  }
-
-  if (isCollapsed && deltaY <= -EXPAND_DELTA_THRESHOLD) {
-    return false;
   }
 
   return isCollapsed;
