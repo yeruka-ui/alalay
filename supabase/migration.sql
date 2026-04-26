@@ -229,10 +229,9 @@ create policy medical_records_policy on public.medical_records
   with check (user_id = auth.uid());
 
 -- ============================================================
--- 8. PERFORMANCE INDEXES
+-- 12. Notifications — track scheduled local-notification IDs
+-- Enables cancellation of scheduled expo-notifications when a
+-- dose is marked taken/skipped/missed.
 -- ============================================================
-create index if not exists idx_medications_user_active
-  on public.medications(user_id, is_active);
-
-create index if not exists idx_schedules_user_date_time
-  on public.medication_schedules(user_id, scheduled_date, scheduled_time);
+alter table public.medication_schedules
+  add column if not exists notification_id text;

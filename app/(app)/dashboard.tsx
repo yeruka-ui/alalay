@@ -20,7 +20,7 @@ import {
   COLLAPSED_SELECTED_DAY_HEIGHT,
   getCalendarDayPresentation,
 } from "@/utils/dashboardCalendarPresentation";
-import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
+import { getActiveMedications, getSchedulesForDate, markScheduleStatus } from "@/utils/database";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -29,10 +29,10 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated as RNAnimated,
   Easing,
   Modal,
   Platform,
+  Animated as RNAnimated,
   Text,
   TouchableOpacity,
   View,
@@ -694,7 +694,7 @@ export default function Dashboard() {
                 }}
                 status={schedule.status as "pending" | "taken"}
                 onTake={async () => {
-                  await updateScheduleStatus(schedule.id, "taken");
+                  await markScheduleStatus(schedule.id, "taken", schedule.notification_id);
                   fetchDashboardData();
                 }}
               />

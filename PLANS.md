@@ -19,16 +19,14 @@
 
 ---
 
-## Phase 0 — Fix Broken Flows (Week 1, Prerequisite)
+## Phase 0 — Fix Broken Flows (COMPLETED 2026-04-26)
 
-These must be done before any new feature work. App is not fully functional without them.
-
-| Item | Why Blocking |
+| Item | Status |
 |---|---|
-| BUG-01: Wire `savePrescription` to voice flow | Core flow silently discards data |
-| BUG-02: Call `createSchedulesForMedication` after save | Dashboard is always empty post-save |
-| SEC-02: Replace `getPublicUrl` with `createSignedUrl` | All prescription images are 404 |
-| SEC-01: Proxy Gemini calls through Edge Function | API key is exposed in bundle |
+| BUG-01 / T-001: Wire `savePrescription` to voice flow | ✅ Fixed |
+| BUG-02 / T-002: Call `createSchedulesForMedication` after save | ✅ Fixed |
+| SEC-02 / T-003: Replace `getPublicUrl` with `createSignedUrl` | ✅ Fixed 2026-04-23 |
+| SEC-01 / T-004: Proxy Gemini calls through Edge Function | ✅ Fixed 2026-04-21 |
 
 ---
 
@@ -74,13 +72,11 @@ Auth screens (`login.tsx`, `signup.tsx`, `onboard.tsx`) are built. Remaining wor
 
 ## Phase 2 — Schedule Engine (Month 2)
 
-Currently medications are saved but no schedules are auto-created. The core value proposition of the app — "take your meds on time" — is inoperative.
+### 2.1 Auto-Schedule on Save ✅ DONE 2026-04-26
+`savePrescription` now calls `createSchedulesForMedication` for each medication (7 days from user-selected `startDate`). Both `prescription_camera.tsx` and `talk_to_alalay.tsx` pass a start date picker. UTC date bug fixed via `manilaDateString()`.
 
-### 2.1 Auto-Schedule on Save
-When `savePrescription` completes, for each medication:
-1. Parse `medication.time` into one or more schedule entries
-2. Create `medication_schedules` rows via `createSchedulesForMedication`
-3. Allow user to configure duration (7, 14, 30 days, or custom)
+**Remaining:**
+- Allow user to configure duration (7, 14, 30 days, or custom) — see T-027
 
 ### 2.2 Schedule Configuration UI
 - Add schedule settings modal on `MedicationCard` — duration picker, custom time picker
@@ -97,8 +93,15 @@ WHERE status = 'pending'
   AND (scheduled_date || ' ' || COALESCE(scheduled_time, '23:59'))::timestamptz < now();
 ```
 
-### 2.4 Push Notifications
-Use Expo Notifications + Supabase Edge Function to send a push at `scheduled_time` for each pending schedule. Store `expo_push_token` in `profiles` table.
+### 2.4 Local Notifications ✅ DONE 2026-04-26
+`expo-notifications` fully wired:
+- Android high-importance channel (`medication-reminders`) + TAKE/SNOOZE action buttons
+- Notifications scheduled on `savePrescription`, cancelled on Take/Skip via `markScheduleStatus`
+- `syncAllPendingNotifications` re-syncs on login (idempotent via stored `notification_id`)
+- Permission requested in onboarding `done.tsx`
+- Manila TZ-correct triggers via `combineManilaDateTime` in `utils/manilaTime.ts`
+
+**Next (Push Notifications):** Store `expo_push_token` in `profiles`. Supabase Edge Function cron sends remote push at `scheduled_time` for users who have background app kill. Requires FCM/APNs setup.
 
 ---
 
@@ -195,9 +198,10 @@ Mobile App → Supabase (anon key, RLS enforced)
 
 ### Database Additions Required
 
-| Phase | New Table/Column |
-|---|---|
-| 1 | `profiles.expo_push_token text` |
-| 3 | `chat_messages(id, user_id, role, content, created_at)` |
-| 4 | `appointments(id, user_id, title, doctor, location, appointment_date, notes)` |
-| 5 | No new tables — views/functions over existing `medication_schedules` |
+| Phase | New Table/Column | Status |
+|---|---|---|
+| 2 | `medication_schedules.notification_id text` | ✅ Done (migration section 12) |
+| 2-push | `profiles.expo_push_token text` | Pending |
+| 3 | `chat_messages(id, user_id, role, content, created_at)` | Pending |
+| 4 | `appointments(id, user_id, title, doctor, location, appointment_date, notes)` | Pending |
+| 5 | No new tables — views/functions over existing `medication_schedules` | Pending |
