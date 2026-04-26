@@ -6,10 +6,10 @@ import type {
   Prescription,
   ProfileUpdate,
 } from "@/types/database";
-import { supabase } from "./supabase";
-import { toDbTime } from "./timeFormat";
 import { manilaDateString } from "./manilaTime";
 import { cancelNotificationFor, scheduleNotificationFor } from "./notifications";
+import { supabase } from "./supabase";
+import { toDbTime } from "./timeFormat";
 
 // ─── Auth Helpers ────────────────────────────────────────────
 
@@ -189,8 +189,8 @@ export async function markScheduleStatus(
 
 export async function createSchedulesForMedication(
   medicationId: number,
-  medicationTime: string | null,
-  userId: string,
+  // medicationTime: string | null,
+  // // userId: string,
   startDate: Date,
   days: number = 7
 ): Promise<MedicationSchedule[]> {

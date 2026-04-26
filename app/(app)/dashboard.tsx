@@ -408,7 +408,7 @@ export default function Dashboard() {
   }, [fetchSchedules]);
 
   useEffect(() => {
-    getActiveMedications().then(setAllMedications).catch(() => {});
+    getActiveMedications().then(setAllMedications).catch(() => { });
   }, []);
 
   const fetchDashboardData = fetchSchedules;
@@ -723,7 +723,7 @@ export default function Dashboard() {
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
           </View>
-        ) : null}
+        )}
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />
