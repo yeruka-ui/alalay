@@ -12,7 +12,7 @@ import {
   isSameDay,
   startOfDay,
 } from "@/utils/dashboardCalendar";
-import { getActiveMedications, getSchedulesForDate, updateScheduleStatus } from "@/utils/database";
+import { getActiveMedications, getSchedulesForDate, markScheduleStatus } from "@/utils/database";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -337,7 +337,7 @@ export default function Dashboard() {
                 }}
                 status={schedule.status as "pending" | "taken"}
                 onTake={async () => {
-                  await updateScheduleStatus(schedule.id, "taken");
+                  await markScheduleStatus(schedule.id, "taken", schedule.notification_id);
                   fetchDashboardData();
                 }}
               />

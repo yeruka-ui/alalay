@@ -8,6 +8,8 @@ import type {
 } from "@/types/database";
 import { supabase } from "./supabase";
 import { toDbTime } from "./timeFormat";
+import { manilaDateString } from "./manilaTime";
+import { cancelNotificationFor, scheduleNotificationFor } from "./notifications";
 
 // ─── Auth Helpers ────────────────────────────────────────────
 
@@ -91,10 +93,31 @@ export async function savePrescription(
   if (medError) throw medError;
 
   // Create schedule rows for the next 7 days starting from startDate
-  await Promise.all(
-    (savedMeds ?? []).map((med) =>
-      createSchedulesForMedication(med.id, startDate, 7)
+  const allSchedules = (
+    await Promise.all(
+      (savedMeds ?? []).map((med) =>
+        createSchedulesForMedication(med.id, startDate, 7)
+      )
     )
+  ).flat();
+
+  // Schedule a local notification for each future pending row
+  const medMap = new Map(
+    (savedMeds ?? []).map((m) => [m.id, m])
+  );
+  await Promise.all(
+    allSchedules.map((schedule) => {
+      const med = medMap.get(schedule.medication_id);
+      if (!med) return Promise.resolve();
+      return scheduleNotificationFor({
+        ...schedule,
+        medication: {
+          name: med.name,
+          dosage: med.dosage,
+          instructions: med.instructions,
+        },
+      });
+    })
   );
 
   return { prescription, medications: savedMeds ?? [] };
@@ -120,7 +143,7 @@ export async function getSchedulesForDate(
   date: Date
 ): Promise<(MedicationSchedule & { medication: Medication })[]> {
   const userId = await getCurrentUserId();
-  const dateStr = date.toISOString().split("T")[0];
+  const dateStr = manilaDateString(date);
 
   const { data, error } = await supabase
     .from("medication_schedules")
@@ -148,33 +171,47 @@ export async function updateScheduleStatus(
   if (error) throw error;
 }
 
+/** DB update + cancel scheduled notification in one call. */
+export async function markScheduleStatus(
+  scheduleId: number,
+  status: "taken" | "missed" | "skipped",
+  notificationId?: string | null
+): Promise<void> {
+  await updateScheduleStatus(scheduleId, status);
+  await cancelNotificationFor(scheduleId, notificationId ?? null);
+}
+
 export async function createSchedulesForMedication(
   medicationId: number,
   startDate: Date,
   days: number = 7
-): Promise<void> {
+): Promise<MedicationSchedule[]> {
   const userId = await getCurrentUserId();
 
   const { data: med } = await supabase
     .from("medications")
-    .select("time")
+    .select("time, name, dosage, instructions")
     .eq("id", medicationId)
     .single();
 
   const rows = [];
   for (let i = 0; i < days; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
+    // Advance in Manila wall time: add i * 86400000ms then take Manila date string
+    const d = new Date(startDate.getTime() + i * 86_400_000);
     rows.push({
       medication_id: medicationId,
       user_id: userId,
-      scheduled_date: d.toISOString().split("T")[0],
+      scheduled_date: manilaDateString(d),
       scheduled_time: med?.time ?? null,
     });
   }
 
-  const { error } = await supabase.from("medication_schedules").insert(rows);
+  const { data, error } = await supabase
+    .from("medication_schedules")
+    .insert(rows)
+    .select();
   if (error) throw error;
+  return data ?? [];
 }
 
 // ─── Medical Records ─────────────────────────────────────────

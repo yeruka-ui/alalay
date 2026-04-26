@@ -48,6 +48,7 @@ export type MedicationSchedule = {
   scheduled_time: string | null; // timetz — stored as "HH:MM:SS+08:00", display via fromDbTime()
   status: "pending" | "taken" | "missed" | "skipped";
   taken_at: string | null;
+  notification_id: string | null; // expo-notifications identifier, null when not scheduled or after cancellation
   created_at: string;
 };
 

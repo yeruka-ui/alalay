@@ -227,3 +227,11 @@ create policy medical_records_policy on public.medical_records
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- ============================================================
+-- 12. Notifications — track scheduled local-notification IDs
+-- Enables cancellation of scheduled expo-notifications when a
+-- dose is marked taken/skipped/missed.
+-- ============================================================
+alter table public.medication_schedules
+  add column if not exists notification_id text;

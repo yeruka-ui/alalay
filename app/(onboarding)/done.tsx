@@ -2,6 +2,7 @@ import BackgroundCircle from "@/components/BackgroundCircle";
 import MascotPlaceholder from "@/components/MascotPlaceholder";
 import { styles } from "@/styles/userOnboarding.styles";
 import { markOnboardingComplete } from "@/utils/database";
+import { requestNotificationPermissions } from "@/utils/notifications";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -20,6 +21,7 @@ export default function OnboardingDone() {
   const handleStart = async () => {
     setLoading(true);
     try {
+      await requestNotificationPermissions(); // best-effort; denied = no crash
       await markOnboardingComplete();
     } finally {
       setLoading(false);
@@ -50,7 +52,7 @@ export default function OnboardingDone() {
 
       <Text style={styles.doneTitle}>Welcome to Alalay!</Text>
       <Text style={styles.doneSubtitle}>
-        I'll help you keep track of your medicines and make sure you never miss a
+        I&apos;ll help you keep track of your medicines and make sure you never miss a
         dose.
       </Text>
 
@@ -66,7 +68,7 @@ export default function OnboardingDone() {
         {loading ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text style={styles.nextButtonText}>Let's Go! 🚀</Text>
+          <Text style={styles.nextButtonText}>Let&apos;s Go! 🚀</Text>
         )}
       </Pressable>
     </View>
