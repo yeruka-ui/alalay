@@ -381,16 +381,13 @@ export default function Dashboard() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchSchedules = useCallback(async () => {
+    setSchedules([]);
     setIsLoadingData(true);
     setFetchError(null);
     try {
-      const [schedulesData, medsData] = await Promise.all([
-        getSchedulesForDate(selectedDate),
-        getActiveMedications(),
-      ]);
+      const schedulesData = await getSchedulesForDate(selectedDate);
       setSchedules(schedulesData);
-      setAllMedications(medsData);
     } catch (err) {
       const isAuthError =
         err instanceof Error &&
@@ -399,7 +396,7 @@ export default function Dashboard() {
       setFetchError(
         isAuthError
           ? "Your session expired. Please log in again."
-          : "Could not load data. Pull to retry."
+          : "Could not load data. Pull to retry.",
       );
     } finally {
       setIsLoadingData(false);
@@ -407,8 +404,14 @@ export default function Dashboard() {
   }, [selectedDate]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    fetchSchedules();
+  }, [fetchSchedules]);
+
+  useEffect(() => {
+    getActiveMedications().then(setAllMedications).catch(() => {});
+  }, []);
+
+  const fetchDashboardData = fetchSchedules;
 
   // Filter data based on active tab
   const filteredSchedules = schedules.filter((s) => {
@@ -720,7 +723,7 @@ export default function Dashboard() {
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Floating Action Menu */}
         <FloatingActionMenu />
