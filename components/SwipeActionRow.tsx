@@ -37,7 +37,7 @@ export default function SwipeActionRow({ children, onTake, onEdit, status }: Pro
     return (
       <View style={styles.rightAction}>
         <Animated.View style={[styles.actionContent, { transform: [{ scale }] }]}>
-          <Feather name="check" size={24} color="#FFF" />
+          <Feather name="edit-2" size={24} color="#FFF" />
           <Text style={styles.actionText}>Edit</Text>
         </Animated.View>
       </View>
@@ -55,7 +55,7 @@ export default function SwipeActionRow({ children, onTake, onEdit, status }: Pro
       <View style={styles.leftAction}>
         <Animated.View style={[styles.actionContent, { transform: [{ scale }] }]}>
           <Text style={styles.actionText}>Take</Text>
-          <Feather name="edit-2" size={24} color="#FFF" />
+          <Feather name="check" size={24} color="#FFF" />
         </Animated.View>
       </View>
     );

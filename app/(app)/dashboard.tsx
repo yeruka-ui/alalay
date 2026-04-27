@@ -179,8 +179,6 @@ function CalendarDayCard({
         onPress={onPress}
       >
         <Animated.View
-          renderToHardwareTextureAndroid
-          shouldRasterizeIOS
           pointerEvents="none"
           style={[
             {
@@ -228,8 +226,6 @@ function CalendarDayCard({
           </View>
         </Animated.View>
         <Animated.View
-          renderToHardwareTextureAndroid
-          shouldRasterizeIOS
           pointerEvents="none"
           style={[
             {
@@ -281,8 +277,6 @@ function CalendarDayCard({
       onPress={onPress}
     >
       <Animated.View
-        renderToHardwareTextureAndroid
-        shouldRasterizeIOS
         pointerEvents="none"
         style={[
           isSelected ? styles.activeCard : styles.inactiveCard,
