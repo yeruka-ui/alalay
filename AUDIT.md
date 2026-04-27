@@ -20,6 +20,17 @@
 
 ## Recent Changes
 
+### 2026-04-27 — Swipe Gestures + AddMedicationWidget Edit Mode (dashboardv3 branch)
+
+⚠️ **BUG-14 found:** `SwipeActionRow` icons/labels swapped — Edit action renders check icon, Take action renders pencil icon. See BUG-14 below.  
+⚠️ **BUG-15 found:** `SwipeActionRow` CSS style names are inverted — `renderLeftActions` uses `styles.rightAction` and vice versa. See BUG-15 below.  
+⚠️ **BUG-16 found:** Edit-via-swipe always creates a duplicate record — `AddMedicationWidget` has no update path. See BUG-16 below.  
+⚠️ **BUG-17 found:** Take action panel still renders for non-pending items — swipe reveals green button that does nothing on already-taken rows. See BUG-17 below.  
+⚠️ **DEBT-18–22 found:** Unused params, missing status type, deprecated callbacks, missing edit-mode title, gesture conflict risk. See below.  
+✅ **`_layout.tsx`:** `GestureHandlerRootView` correctly wraps root — RNGH gesture system properly initialized.
+
+---
+
 ### 2026-04-26 — Phase 0 Core Flows Complete + Local Notifications (T-001, T-002, T-021)
 
 ✅ **T-001 / BUG-01 fixed:** Voice flow (`app/(app)/talk_to_alalay.tsx`) now calls `savePrescription` with loading state, error handling, and start date picker. File also moved into `(app)` route group.  
@@ -209,6 +220,54 @@ All `console.log` calls with PII (`email`, navigation timing) removed from `logi
 
 ---
 
+### BUG-14 — SwipeActionRow: Icons and Labels Are Swapped
+**Severity: High**
+
+`components/SwipeActionRow.tsx:30-62`
+
+`renderLeftActions` (swipe-right → Edit) renders `<Feather name="check">` with label `"Edit"`.  
+`renderRightActions` (swipe-left → Take) renders `<Feather name="edit-2">` with label `"Take"`.  
+Icons are on the wrong actions — check mark should indicate Take, pencil should indicate Edit.
+
+**Fix:** In `renderLeftActions` change icon to `"edit-2"`. In `renderRightActions` change icon to `"check"`. Tracked as T-048.
+
+---
+
+### BUG-15 — SwipeActionRow: Style Names Are Reversed
+**Severity: Low**
+
+`components/SwipeActionRow.tsx:38, 55`
+
+`renderLeftActions` returns `<View style={styles.rightAction}>` (purple).  
+`renderRightActions` returns `<View style={styles.leftAction}>` (green).  
+Style object names are inverted relative to the function they appear in. Functionally correct by accident (green=Take, purple=Edit matches brand), but causes confusion and maintenance risk.
+
+**Fix:** Rename `leftAction` → `takeAction` and `rightAction` → `editAction` to match semantic intent. Tracked as T-049.
+
+---
+
+### BUG-16 — Edit-via-Swipe Creates Duplicate Record Instead of Updating
+**Severity: High**
+
+`app/(app)/dashboard.tsx:698-704`, `components/AddMedicationWidget.tsx:131-148`
+
+`onEdit` populates `editData` and opens `AddMedicationWidget`. The widget's `handleSave` always calls `saveManualMedication` (INSERT) or `saveAppointment` (INSERT) — there is no update path. Swiping to edit a medication silently creates a new duplicate prescription row in the DB.
+
+**Fix:** `AddMedicationWidget` needs a `medicationId` / `scheduleId` prop and an update branch in `handleSave` that calls an `updateMedication` helper. Tracked as T-050.
+
+---
+
+### BUG-17 — Take Swipe Action Renders for Non-Pending Items with No Feedback
+**Severity: Medium**
+
+`components/SwipeActionRow.tsx:47-62, 67`
+
+`renderRightActions` (green Take panel) is unconditionally provided to `<Swipeable>`. The `handleRightOpen` guard `if (status === "pending")` prevents the DB call, but the green panel still slides in when the user swipes a taken/missed row. User gets no feedback; the swipe appears to fail silently.
+
+**Fix:** Gate `renderRightActions` on `status === "pending"` the same way `renderLeftActions` is gated. Tracked as T-051.
+
+---
+
 ### BUG-03 — `appointments` Tab Is Entirely Non-Functional
 **Severity: Medium**
 
@@ -328,3 +387,36 @@ Tracked as T-039.
 `app/(auth)/index.tsx` has git status `AD` — staged as new empty file, then deleted in working tree. The `(auth)` group has no default child route.
 
 **Fix:** Commit the deletion (guard handles default routing) or add a meaningful redirect. Tracked as T-043.
+
+### DEBT-18 — `progress` Param Declared But Unused in SwipeActionRow Render Callbacks
+`components/SwipeActionRow.tsx:30, 47`
+
+Both `renderLeftActions` and `renderRightActions` declare `progress: Animated.AnimatedInterpolation<number>` but never reference it. Causes lint warning. Rename to `_progress` or remove.
+
+### DEBT-19 — SwipeActionRow `status` Prop Missing `"missed"` Union Member
+`components/SwipeActionRow.tsx:10`, `app/(app)/dashboard.tsx:714`
+
+`status` prop typed as `"pending" | "taken"` but `medication_schedules.status` includes `"missed"` (used by planned cron job T-019). Dashboard casts `schedule.status as "pending" | "taken"` which is unsafe once missed-marking is enabled.
+
+**Fix:** Add `"missed"` to the union in `SwipeActionRow` Props. Dashboard cast can then be removed. Tracked as T-052.
+
+### DEBT-20 — Deprecated `onSwipeableLeftOpen` / `onSwipeableRightOpen` Callbacks
+`components/SwipeActionRow.tsx:69-70`
+
+`onSwipeableLeftOpen` and `onSwipeableRightOpen` are deprecated in RNGH v2+. Prefer `onSwipeableOpen={(direction) => direction === "left" ? handleLeftOpen() : handleRightOpen()}`.
+
+**Fix:** Replace both props with single `onSwipeableOpen`. Tracked as T-053.
+
+### DEBT-21 — AddMedicationWidget Title Always Says "Add" in Edit Mode
+`components/AddMedicationWidget.tsx:237-239`
+
+When opened via swipe-to-edit, the widget title renders `"Add medication"` / `"Add appointment"` regardless of whether `initialData` is provided. Should read `"Edit medication"` when in edit context.
+
+**Fix:** `{initialData ? "Edit" : "Add"} {isAppointment ? "appointment" : "medication"}`. Tracked as T-054.
+
+### DEBT-22 — Gesture Conflict Risk: Swipeable Inside Reanimated ScrollView
+`app/(app)/dashboard.tsx:684-721`
+
+`SwipeActionRow` uses RNGH `Swipeable` inside `Animated.ScrollView` from `react-native-reanimated`. On Android, the horizontal swipe gesture competes with the vertical scroll gesture. Without `simultaneousHandlers` or a RNGH-native `ScrollView`, swipe detection can be unreliable or cause scroll jank.
+
+**Fix:** Wrap the list in RNGH `ScrollView` instead of Reanimated's `Animated.ScrollView`, or add `simultaneousHandlers` ref to each `Swipeable`. Tracked as T-055.

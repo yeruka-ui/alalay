@@ -24,6 +24,11 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSaved?: () => void;
+  initialData?: {
+    name: string;
+    description: string;
+    isAppointment?: boolean;
+  } | null;
 };
 
 function dbTimeToDate(timetz: string): Date {
@@ -60,7 +65,7 @@ const FREQUENCY_OPTIONS = [
 
 const MAX_DESCRIPTION = 200;
 
-export default function AddMedicationWidget({ visible, onClose, onSaved }: Props) {
+export default function AddMedicationWidget({ visible, onClose, onSaved, initialData }: Props) {
   const [medicationName, setMedicationName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"medication" | "appointment">("medication");
@@ -83,6 +88,22 @@ export default function AddMedicationWidget({ visible, onClose, onSaved }: Props
     const { intakeTimes: defaults } = parseFrequency(selectedFrequency);
     setIntakeTimes(defaults.map(dbTimeToDate));
   }, [selectedFrequency]);
+
+  useEffect(() => {
+    if (visible) {
+      if (initialData) {
+        setMedicationName(initialData.name);
+        setDescription(initialData.description);
+        setSelectedCategory(initialData.isAppointment ? "appointment" : "medication");
+      } else {
+        // We do a soft reset for non-edit mode
+        setMedicationName("");
+        setDescription("");
+        setSelectedCategory("medication");
+        setSelectedFrequency("Three times a day");
+      }
+    }
+  }, [visible, initialData]);
 
   const isAppointment = selectedCategory === "appointment";
 
