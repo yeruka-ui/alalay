@@ -1,50 +1,85 @@
-# Welcome to your Expo app 👋
+# Alalay
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Prescription management app for Filipino users. Photograph a prescription or describe it by voice — Gemini extracts medications, schedules doses, and sends reminders.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- **Expo 54** (React Native 0.81, React 19) — New Architecture + React Compiler enabled
+- **TypeScript** — typed routes via expo-router
+- **expo-router** — file-based routing with auth guard
+- **Supabase** — auth, Postgres (RLS), Storage, Edge Functions
+- **Gemini** — OCR + voice analysis, server-side only via Edge Functions
+- **expo-notifications** — local medication reminders
+- **fuse.js** — fuzzy drug name validation against Philippine medication database
 
-   ```bash
-   npm install
-   ```
+## Setup
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+**Prerequisites:** Node 18+, Expo Go (device) or Android/iOS emulator.
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Create `.env.local` at project root:
 
-## Learn more
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Gemini API key is server-side only — never in `.env`:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npx supabase secrets set GEMINI_API_KEY=your-key
+```
 
-## Join the community
+## Commands
 
-Join our community of developers creating universal apps.
+```bash
+npx expo start        # Dev server (scan QR with Expo Go, or press a/i)
+npm run android       # Android emulator
+npm run ios           # iOS simulator
+npm run web           # Web (static output)
+npm run lint          # ESLint
+npm run test:unit     # Unit tests (tsx)
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Architecture
+
+**Route groups** partition the app:
+
+| Group | Screens |
+|---|---|
+| `(auth)` | `onboard`, `login`, `signup` |
+| `(onboarding)` | `step1–3`, `done` |
+| `(app)` | `dashboard`, `prescription_camera`, `record_locker`, `alalay_chat`, `talk_to_alalay` |
+
+**Auth guard** in `app/_layout.tsx` — watches `onAuthStateChange`, redirects based on session + onboarding status.
+
+**Key flows:**
+- Prescription OCR: image → base64 → Edge Function → Gemini → `MedicationItem[]` → save → 7-day schedule → notifications
+- Voice: audio → base64 → Edge Function → Gemini → same save path
+- Dashboard: date select → `getSchedulesForDate()` → "Take" → `markScheduleStatus()` → cancel notification
+
+**Database:** `profiles`, `prescriptions`, `medications`, `medication_schedules`, `medical_records` — all RLS-scoped to `auth.uid()`.
+
+## Project Layout
+
+```
+app/                  # Screens (file-based routing)
+components/           # Shared UI components
+utils/                # Supabase client, AI proxy, DB helpers, notifications, auth
+supabase/
+  functions/          # Edge Functions (analyze-prescription, analyze-audio)
+  migration.sql       # Full schema + RLS
+styles/               # Per-screen stylesheet files
+data/                 # medicationDatabase.ts (~225 PH drug names)
+types/                # TypeScript types matching Supabase schema
+```
+
+## Docs
+
+- [`CLAUDE.md`](CLAUDE.md) — full architecture reference for AI-assisted development
+- [`TASKS.md`](TASKS.md) — feature backlog + bug tracker
+- [`AUDIT.md`](AUDIT.md) — codebase health report (SEC/BUG/DEBT findings)
+- [`PLANS.md`](PLANS.md) — strategic roadmap
