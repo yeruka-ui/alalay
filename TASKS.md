@@ -282,6 +282,66 @@ Prompt user: "For how many days?" (7 / 14 / 30 / custom). Pass to `createSchedul
 ### [T-028] Add: Edit/delete individual schedule entries from dashboard
 Long-press on a schedule card to edit time or delete the entry.
 
+### [T-048] Fix: SwipeActionRow icons and labels are swapped
+**File:** `components/SwipeActionRow.tsx:38-44, 54-61`  
+**Description:** `renderLeftActions` (Edit) shows check icon; `renderRightActions` (Take) shows pencil icon. Opposite of intent.  
+**Success criteria:** Edit action uses `<Feather name="edit-2">`. Take action uses `<Feather name="check">`.
+
+---
+
+### [T-049] Fix: SwipeActionRow style names are reversed
+**File:** `components/SwipeActionRow.tsx:80-107`  
+**Description:** `leftAction` style is green (Take color); `rightAction` is purple (Edit color). Names imply position, not action — inverted relative to their render functions.  
+**Success criteria:** Rename to `takeAction` (green) and `editAction` (purple). Update both `renderLeftActions` and `renderRightActions` usages.
+
+---
+
+### [T-050] Fix: Edit-via-swipe creates duplicate record instead of updating
+**Files:** `components/AddMedicationWidget.tsx:124-155`, `utils/database.ts`  
+**Description:** `handleSave` always calls `saveManualMedication` / `saveAppointment` (INSERT). No update path. Swiping to edit creates a new duplicate row.  
+**Success criteria:**  
+- Add `medicationId?: number` prop to `AddMedicationWidget`  
+- Add `updateMedication({ id, name, description, intakeTimes, startDate, endDate })` helper in `utils/database.ts`  
+- `handleSave` branches: if `medicationId` provided → UPDATE, else → INSERT  
+- Dashboard passes `schedule.medication.id` through `editData`
+
+---
+
+### [T-051] Fix: Take swipe action renders for non-pending items
+**File:** `components/SwipeActionRow.tsx:67`  
+**Description:** `renderRightActions` always provided; swipe-left on a taken/missed row shows green "Take" panel that silently does nothing.  
+**Success criteria:** Pass `renderRightActions={status === "pending" ? renderRightActions : undefined}` to `<Swipeable>`.
+
+---
+
+### [T-052] Fix: SwipeActionRow `status` prop missing `"missed"` type
+**Files:** `components/SwipeActionRow.tsx:10`, `app/(app)/dashboard.tsx:714`  
+**Description:** Prop typed `"pending" | "taken"`. Once T-019 cron marks missed medications, dashboard cast `as "pending" | "taken"` becomes unsafe.  
+**Success criteria:** Add `"missed"` to `SwipeActionRow` Props `status` union. Remove unsafe cast in dashboard.
+
+---
+
+### [T-053] Refactor: Replace deprecated swipe callbacks in SwipeActionRow
+**File:** `components/SwipeActionRow.tsx:69-70`  
+**Description:** `onSwipeableLeftOpen` / `onSwipeableRightOpen` deprecated in RNGH v2+.  
+**Success criteria:** Replace with `onSwipeableOpen={(direction) => direction === "left" ? handleLeftOpen() : handleRightOpen()}`.
+
+---
+
+### [T-054] Fix: AddMedicationWidget title shows "Add" in edit mode
+**File:** `components/AddMedicationWidget.tsx:237`  
+**Description:** Title reads "Add medication" when opened via swipe-to-edit. Should read "Edit medication".  
+**Success criteria:** Title uses `initialData ? "Edit" : "Add"` prefix.
+
+---
+
+### [T-055] Fix: Gesture conflict — Swipeable inside Reanimated ScrollView
+**File:** `app/(app)/dashboard.tsx:684`  
+**Description:** RNGH `Swipeable` inside Reanimated `Animated.ScrollView` causes horizontal/vertical gesture conflict, especially on Android.  
+**Success criteria:** Replace list container with RNGH `ScrollView` (from `react-native-gesture-handler`), or configure `simultaneousHandlers` refs on each `Swipeable`.
+
+---
+
 ### [T-045] Add: Google / Apple sign-in (or remove stubs)
 **File:** `app/(auth)/login.tsx:189-205`  
 Implement with `expo-auth-session` + Google Identity Services and Sign in with Apple, OR remove both buttons and the `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` env var.

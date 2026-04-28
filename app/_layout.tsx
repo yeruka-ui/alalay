@@ -2,15 +2,18 @@ import { AppErrorBoundary } from "@/components/ErrorBoundary";
 import { checkOnboardingComplete } from "@/utils/database";
 import {
   configureNotifications,
+  requestNotificationPermissions,
   snoozeNotification,
   syncAllPendingNotifications,
 } from "@/utils/notifications";
+import { initializeNotificationSession } from "@/utils/notificationSession";
 import { supabase } from "@/utils/supabase";
 import type { Session } from "@supabase/supabase-js";
 import * as Notifications from "expo-notifications";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -74,11 +77,28 @@ export default function RootLayout() {
     if (!session || !onboardingDone) return;
     const userId = session.user.id;
     if (notifSyncedRef.current === userId) return;
-    notifSyncedRef.current = userId;
 
-    configureNotifications().then(() =>
-      syncAllPendingNotifications(userId)
-    );
+    let cancelled = false;
+
+    void initializeNotificationSession(userId, {
+      configureNotifications,
+      requestNotificationPermissions,
+      syncAllPendingNotifications,
+    })
+      .then((readyToSync) => {
+        if (!cancelled && readyToSync) {
+          notifSyncedRef.current = userId;
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          notifSyncedRef.current = null;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [session, onboardingDone]);
 
   // Reset sync ref on logout so the next login re-syncs
@@ -113,10 +133,12 @@ export default function RootLayout() {
   }, [router]);
 
   return (
-    <SafeAreaProvider>
-      <AppErrorBoundary>
-        <Slot />
-      </AppErrorBoundary>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppErrorBoundary>
+          <Slot />
+        </AppErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

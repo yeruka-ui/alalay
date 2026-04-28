@@ -82,6 +82,8 @@ app/
 | `app/(auth)/signup.tsx` | Account creation with name, email, password, role picker, terms checkbox |
 | `app/(app)/_layout.tsx` | App route group: Stack layout for protected screens (dashboard, etc.) |
 | `components/MedicationCard.tsx` | Card with edit modal, suggestion banner, confidence indicators |
+| `components/SwipeActionRow.tsx` | RNGH `Swipeable` wrapper — swipe-right=Edit, swipe-left=Take. Known issues: icons/labels swapped (BUG-14/T-048), no update path (BUG-16/T-050), Take panel renders for non-pending (BUG-17/T-051), gesture conflict in Reanimated ScrollView (DEBT-22/T-055) |
+| `components/AddMedicationWidget.tsx` | Modal for creating medications and appointments. `initialData` pre-fills fields for edit mode, but `handleSave` always INSERTs — no update path yet (BUG-16/T-050) |
 | `components/BackgroundCircle.tsx` | Decorative gradient circle used on auth screens. `blur` prop is a no-op on native (BUG-10 / T-037) |
 | `components/floatingActionMenu.tsx` | Animated FAB with camera/document/mic actions |
 | `components/tabFilterBar.tsx` | Reusable tab/filter bar used on dashboard and record locker |

@@ -41,6 +41,25 @@ BUG-06/07/08 resolved. Remaining blockers before auth is shippable:
 
 ---
 
+## Phase 0.3 — Swipe Gesture Hardening (dashboardv3 branch)
+
+Swipe-to-take and swipe-to-edit implemented. Critical issues must be fixed before merge:
+
+| Item | Priority | Status |
+|---|---|---|
+| BUG-14 / T-048: Icons and labels swapped in SwipeActionRow | P1 | [ ] |
+| BUG-16 / T-050: Edit creates duplicate record (no update path) | P0 | [ ] |
+| BUG-17 / T-051: Take panel renders for non-pending items | P1 | [ ] |
+| BUG-15 / T-049: Style names reversed (maintenance risk) | P2 | [ ] |
+| DEBT-19 / T-052: Missing `"missed"` in status union | P2 | [ ] |
+| DEBT-20 / T-053: Deprecated swipe callbacks | P3 | [ ] |
+| DEBT-21 / T-054: Widget title says "Add" in edit mode | P2 | [ ] |
+| DEBT-22 / T-055: Gesture conflict in Reanimated ScrollView | P1 | [ ] |
+
+**Merge gate:** T-048, T-050, T-051, T-055 must be resolved before merging dashboardv3 → master.
+
+---
+
 ## Phase 1 — Authentication & Core Stability (Weeks 2–4)
 
 ### 1.1 Authentication Flow

@@ -1,5 +1,7 @@
+import AddMedicationWidget from "@/components/AddMedicationWidget";
 import FloatingActionMenu from "@/components/floatingActionMenu";
 import MedicationCard from "@/components/MedicationCard";
+import SwipeActionRow from "@/components/SwipeActionRow";
 import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
 import type { Medication, MedicationSchedule } from "@/types/database";
@@ -177,8 +179,6 @@ function CalendarDayCard({
         onPress={onPress}
       >
         <Animated.View
-          renderToHardwareTextureAndroid
-          shouldRasterizeIOS
           pointerEvents="none"
           style={[
             {
@@ -226,8 +226,6 @@ function CalendarDayCard({
           </View>
         </Animated.View>
         <Animated.View
-          renderToHardwareTextureAndroid
-          shouldRasterizeIOS
           pointerEvents="none"
           style={[
             {
@@ -279,8 +277,6 @@ function CalendarDayCard({
       onPress={onPress}
     >
       <Animated.View
-        renderToHardwareTextureAndroid
-        shouldRasterizeIOS
         pointerEvents="none"
         style={[
           isSelected ? styles.activeCard : styles.inactiveCard,
@@ -343,6 +339,8 @@ export default function Dashboard() {
     getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAddMedOpen, setIsAddMedOpen] = useState(false);
+  const [editData, setEditData] = useState<{name: string, description: string, isAppointment?: boolean} | null>(null);
   const { width: screenWidth } = useWindowDimensions();
   const carouselRef = useRef<ICarouselInstance>(null);
   const shouldResetCarouselRef = useRef(false);
@@ -408,7 +406,7 @@ export default function Dashboard() {
   }, [fetchSchedules]);
 
   useEffect(() => {
-    getActiveMedications().then(setAllMedications).catch(() => {});
+    getActiveMedications().then(setAllMedications).catch(() => { });
   }, []);
 
   const fetchDashboardData = fetchSchedules;
@@ -598,7 +596,7 @@ export default function Dashboard() {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.purpleButton}>
+              <TouchableOpacity style={styles.purpleButton} onPress={() => { setEditData(null); setIsAddMedOpen(true); }}>
                 <Text style={styles.addTaskText}>+ Add Task</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -683,21 +681,37 @@ export default function Dashboard() {
             scrollEventThrottle={16}
           >
             {filteredSchedules.map((schedule) => (
-              <MedicationCard
+              <SwipeActionRow
                 key={schedule.id}
-                item={{
-                  id: String(schedule.id),
-                  name: schedule.medication?.name ?? "",
-                  instructions: schedule.medication?.instructions ?? "",
-                  dosage: schedule.medication?.dosage ?? undefined,
-                  time: formatTime(schedule.scheduled_time),
-                }}
                 status={schedule.status as "pending" | "taken"}
                 onTake={async () => {
                   await markScheduleStatus(schedule.id, "taken", schedule.notification_id);
                   fetchDashboardData();
                 }}
-              />
+                onEdit={() => {
+                  setEditData({
+                    name: schedule.medication?.name ?? "",
+                    description: schedule.medication?.instructions ?? "",
+                    isAppointment: false
+                  });
+                  setIsAddMedOpen(true);
+                }}
+              >
+                <MedicationCard
+                  item={{
+                    id: String(schedule.id),
+                    name: schedule.medication?.name ?? "",
+                    instructions: schedule.medication?.instructions ?? "",
+                    dosage: schedule.medication?.dosage ?? undefined,
+                    time: formatTime(schedule.scheduled_time),
+                  }}
+                  status={schedule.status as "pending" | "taken"}
+                  onTake={async () => {
+                    await markScheduleStatus(schedule.id, "taken", schedule.notification_id);
+                    fetchDashboardData();
+                  }}
+                />
+              </SwipeActionRow>
             ))}
           </Animated.ScrollView>
         ) : activeTab === "medication" && allMedications.length > 0 ? (
@@ -707,26 +721,51 @@ export default function Dashboard() {
             scrollEventThrottle={16}
           >
             {allMedications.map((med) => (
-              <MedicationCard
+              <SwipeActionRow
                 key={med.id}
-                item={{
-                  id: String(med.id),
-                  name: med.name,
-                  instructions: med.instructions ?? "",
-                  dosage: med.dosage ?? undefined,
-                  time: "",
+                status="taken" // prevents left swipe
+                onTake={() => {}}
+                onEdit={() => {
+                  setEditData({
+                    name: med.name,
+                    description: med.instructions ?? "",
+                    isAppointment: false
+                  });
+                  setIsAddMedOpen(true);
                 }}
-              />
+              >
+                <MedicationCard
+                  item={{
+                    id: String(med.id),
+                    name: med.name,
+                    instructions: med.instructions ?? "",
+                    dosage: med.dosage ?? undefined,
+                    time: "",
+                  }}
+                />
+              </SwipeActionRow>
             ))}
           </Animated.ScrollView>
         ) : (
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
           </View>
-        ) : null}
+        )}
 
-        {/* Floating Action Menu */}
         <FloatingActionMenu />
+        <AddMedicationWidget
+          visible={isAddMedOpen}
+          initialData={editData}
+          onClose={() => {
+            setIsAddMedOpen(false);
+            setEditData(null);
+          }}
+          onSaved={() => {
+            setIsAddMedOpen(false);
+            setEditData(null);
+            fetchDashboardData();
+          }}
+        />
       </View>
 
       {/* iOS: native spinner inside a slide-up modal with a Done button */}
@@ -748,6 +787,8 @@ export default function Dashboard() {
               value={selectedDate}
               mode="date"
               display="spinner"
+              textColor="#000000"
+              themeVariant="light"
               onChange={(_: DateTimePickerEvent, date?: Date) => {
                 if (date) handleSelectedDateChange(date);
               }}
