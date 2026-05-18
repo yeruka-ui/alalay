@@ -85,7 +85,7 @@ export async function warmupOllama(): Promise<void> {
 export async function callOllamaVision(
   base64: string,
   prompt: string,
-  opts?: { numCtx?: number },
+  opts?: { numCtx?: number; jsonFormat?: boolean },
 ): Promise<{ text: string; truncated: boolean }> {
   const url = process.env.EXPO_PUBLIC_OLLAMA_URL;
   if (!url) {
@@ -106,7 +106,7 @@ export async function callOllamaVision(
         prompt,
         images: [base64],
         stream: false,
-        format: "json",
+        ...(opts?.jsonFormat !== false ? { format: "json" } : {}),
         options: {
           num_predict: -1, // no output token cap — required for prescriptions with many medications
           ...(opts?.numCtx != null ? { num_ctx: opts.numCtx } : {}),
@@ -167,6 +167,107 @@ export async function callOllamaVision(
   console.log(`[ollama] prompt eval  : ${promptMs ?? "?"} ms  (${promptTokens} tokens)`);
   console.log(`[ollama] generation   : ${evalMs ?? "?"} ms  (${evalTokens} tokens · ${tokPerSec} tok/s)`);
   console.log(`[ollama] done reason  : ${doneReason}${truncated ? " ⚠️  OUTPUT WAS TRUNCATED — increase num_predict" : ""}`);
+  console.log(`[ollama] raw response : ${result?.response}`);
+  console.log(`[ollama] ──────────────────────────────────────────`);
+
+  const text: string | undefined = result?.response;
+  if (!text) {
+    throw new OllamaError("UPSTREAM", "Empty response from Ollama", 502);
+  }
+  return { text, truncated };
+}
+
+// ─── Two-pass prompts ────────────────────────────────────────────────────────
+
+export const OLLAMA_EXTRACT_PROMPT = `Read this prescription image and transcribe every word you can see, exactly as written.
+
+List each medication line by line with its dosage, instructions, and duration.
+For text that is hard to read, write your best guess — do not skip anything.
+
+Output the transcribed text only. No JSON, no formatting, no commentary.`;
+
+export const makeOllamaStructurePrompt = (rawText: string) =>
+  `You are a pharmacist. From the prescription text below, extract all medications and return a JSON array.
+
+PRESCRIPTION TEXT:
+${rawText}
+
+For each medication, create an object with exactly these fields:
+- "name": medication name (string)
+- "dosage": dose e.g. "500mg" (string, or null if not present)
+- "instructions": when/how to take e.g. "after meals" (string, default "after meals")
+- "frequency": times per day as integer 1–4. Examples: "once daily"→1, "twice a day"→2, "3x a day"→3, "every 8 hours"→3, "every 6 hours"→4, "QID"→4
+- "days": duration in days as integer (default 7 if not stated). Examples: "for 7 days"→7, "for a month"→30, "as needed"→7
+- "confidence": "low" if the original text was hard to read, "high" if clear, "medium" otherwise
+
+RULES:
+1. Output ONLY a JSON array. No wrapper object, no explanation, no extra keys.
+2. ONE object per medication name. Never duplicate.
+3. Include every medication mentioned in the text.
+4. If a name is unclear, still include it with "confidence":"low".
+
+Output the JSON array only.`;
+
+export async function callOllama(
+  prompt: string,
+  opts?: { numCtx?: number },
+): Promise<{ text: string; truncated: boolean }> {
+  const url = process.env.EXPO_PUBLIC_OLLAMA_URL;
+  if (!url) {
+    throw new OllamaError("UNKNOWN", "EXPO_PUBLIC_OLLAMA_URL not configured", 500);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  const t0 = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(`${url}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt,
+        stream: false,
+        format: "json",
+        options: {
+          num_predict: -1,
+          ...(opts?.numCtx != null ? { num_ctx: opts.numCtx } : {}),
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    const isAbort =
+      err instanceof Error &&
+      (err.name === "AbortError" || err.message.includes("aborted"));
+    throw new OllamaError(
+      "UNAVAILABLE",
+      isAbort ? "Ollama request timed out" : "Could not reach Ollama server",
+      503,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    throw new OllamaError(
+      "UPSTREAM",
+      `Ollama error: ${response.status}`,
+      response.status >= 400 && response.status < 600 ? response.status : 502,
+    );
+  }
+
+  const result = await response.json();
+  const wallMs = Date.now() - t0;
+  const doneReason: string = result?.done_reason ?? "unknown";
+  const truncated = doneReason === "length";
+
+  console.log(`[ollama] ─── text inference complete ────────────────`);
+  console.log(`[ollama] wall time    : ${wallMs} ms`);
+  console.log(`[ollama] done reason  : ${doneReason}${truncated ? " ⚠️  OUTPUT WAS TRUNCATED" : ""}`);
   console.log(`[ollama] raw response : ${result?.response}`);
   console.log(`[ollama] ──────────────────────────────────────────`);
 
