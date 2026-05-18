@@ -17,34 +17,31 @@ export class OllamaError extends Error {
 
 export const OLLAMA_PRESCRIPTION_PROMPT = `Analyze this prescription image and extract ALL medications.
 
-STEP 1 — Scan the entire image top to bottom. Count every distinct medication name you can see, even if partially legible.
-STEP 2 — Output ONE JSON object per medication. Do NOT stop until every medication from STEP 1 is included.
+STEP 1 — Transcribe the image exactly as written.
+STEP 2 — Extract medications from your transcription.
 
-Each object must have exactly these fields:
+You must output a SINGLE JSON object with exactly two keys:
+- "transcription": (string) Your complete, word-for-word transcription of the entire prescription.
+- "medications": (array) A list of medication objects extracted from the transcription.
+
+Each object in the "medications" array must have exactly these fields:
 - "name": medication name (string)
-- "dosage": dose amount e.g. "500mg" (string)
+- "dosage": dose amount e.g. "500mg" (string, or null if not present)
 - "instructions": when to take e.g. "after meals" (string, default "after meals" if unclear)
 - "frequency": how many times per day as an integer (1, 2, 3, or 4)
 - "days": how many days to take it as an integer (default 7 if not stated)
 - "confidence": "low", "medium", or "high" based on image readability
 
 RULES:
-1. Your ENTIRE response must be a single JSON array. NEVER use {"status":...}, {"error":...}, or any wrapper object.
-2. ONE object per medication name. Never duplicate.
-3. "frequency" must be an integer (e.g. "3x a day" → 3, "twice daily" → 2, "once daily" → 1).
-4. "days" must be an integer (e.g. "for 7 days" → 7, "for a month" → 30).
-5. If instructions are unclear, use "after meals".
-6. If partially unreadable, still include the entry with confidence "low".
-7. Include EVERY medication — missing even one is a critical error.
+1. "frequency" must be an integer (e.g. "3x a day" → 3, "twice daily" → 2, "once daily" → 1).
+2. "days" must be an integer (e.g. "for 7 days" → 7, "for a month" → 30).
+3. If instructions are unclear, use "after meals".
+4. If partially unreadable, still include the entry with confidence "low".
+5. Include EVERY medication — missing even one is a critical error.
 
-Examples:
-"Lipitor 10mg once daily" → [{"name":"Lipitor","dosage":"10mg","instructions":"after meals","frequency":1,"days":30,"confidence":"medium"}]
-"Amoxicillin 500mg 3x a day for 7 days" → [{"name":"Amoxicillin","dosage":"500mg","instructions":"after meals","frequency":3,"days":7,"confidence":"high"}]
-"Metformin 500mg twice daily, Amlodipine 5mg once daily, Lipitor 10mg once daily" → [{"name":"Metformin","dosage":"500mg","instructions":"after meals","frequency":2,"days":30,"confidence":"high"},{"name":"Amlodipine","dosage":"5mg","instructions":"after meals","frequency":1,"days":30,"confidence":"high"},{"name":"Lipitor","dosage":"10mg","instructions":"after meals","frequency":1,"days":30,"confidence":"high"}]
+Output the JSON object only. No explanation, no status, no other text.`;
 
-Output the JSON array only. No explanation, no status, no other text.`;
-
-export const STRICT_RETRY_PREFIX = `STRICT MODE — your previous attempt failed because you produced a non-array object (e.g. {"error":...} or {"status":...}). Output ONLY the JSON array — no explanations, no thinking, no commentary, no error/status/message fields. Begin your response with [ immediately and end with ]. If you cannot read a medication, still include it with "confidence":"low".
+export const STRICT_RETRY_PREFIX = `STRICT MODE — your previous attempt failed. Output ONLY the JSON object — no explanations, no thinking, no commentary. Begin your response with { immediately and end with }. If you cannot read a medication, still include it with "confidence":"low".
 
 `;
 

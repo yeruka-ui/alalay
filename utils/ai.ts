@@ -1,6 +1,6 @@
 import type { MedicationItem } from "@/components/MedicationCard";
 import { supabase } from "./supabase";
-import { callOllama, callOllamaVision, makeOllamaStructurePrompt, OllamaError, OLLAMA_EXTRACT_PROMPT, STRICT_RETRY_PREFIX } from "./ollama";
+import { callOllama, callOllamaVision, makeOllamaStructurePrompt, OllamaError, OLLAMA_EXTRACT_PROMPT, OLLAMA_PRESCRIPTION_PROMPT, STRICT_RETRY_PREFIX } from "./ollama";
 import { MedicationParseError, parseMedications } from "./parseMedications";
 
 type AiErrorCode =
@@ -76,29 +76,17 @@ export async function analyzePrescription(
   _mimeType: string,
 ): Promise<MedicationItem[]> {
   const t0 = Date.now();
-  // Pass 1 — extract raw text from the image (no JSON format, free-form transcription)
-  let rawText: string;
-  try {
-    console.log("[ai] Pass 1 — extracting raw prescription text");
-    ({ text: rawText } = await callOllamaVision(base64, OLLAMA_EXTRACT_PROMPT, { jsonFormat: false }));
-    console.log("[ai] Pass 1 raw text:", rawText);
-  } catch (err) {
-    if (err instanceof OllamaError) throw new Error(mapAiError(err.code));
-    throw new Error(mapAiError("UNKNOWN"));
-  }
 
-  // Pass 2 — structure raw text into MedicationItem[] (text-only, JSON format)
   try {
-    console.log("[ai] Pass 2 — structuring into medication objects");
-    let { text, truncated } = await callOllama(makeOllamaStructurePrompt(rawText));
+    console.log("[ai] Single-pass extraction — vision + structure");
+    let { text, truncated } = await callOllamaVision(base64, OLLAMA_PRESCRIPTION_PROMPT, { jsonFormat: true });
 
     if (truncated) {
-      console.log("[ai] Pass 2 output truncated — retrying with numCtx=16384");
+      console.log("[ai] Output truncated — retrying with numCtx=16384");
       try {
-        ({ text, truncated } = await callOllama(makeOllamaStructurePrompt(rawText), { numCtx: 16384 }));
-        if (truncated) console.log("[ai] Still truncated at numCtx=16384 — parsing partial result");
+        ({ text, truncated } = await callOllamaVision(base64, OLLAMA_PRESCRIPTION_PROMPT, { jsonFormat: true, numCtx: 16384 }));
       } catch (retryErr) {
-        console.log("[ai] Context retry failed — parsing partial result:", retryErr);
+        console.log("[ai] Context retry failed:", retryErr);
       }
     }
 
@@ -109,16 +97,16 @@ export async function analyzePrescription(
     return meds;
   } catch (err) {
     if (err instanceof MedicationParseError) {
-      console.log("[ai] Pass 2 refused — retrying with strict prompt");
+      console.log("[ai] Extraction refused — retrying with strict prompt");
       try {
-        const { text } = await callOllama(STRICT_RETRY_PREFIX + makeOllamaStructurePrompt(rawText));
+        const { text } = await callOllamaVision(base64, STRICT_RETRY_PREFIX + OLLAMA_PRESCRIPTION_PROMPT, { jsonFormat: true });
         const meds = parseMedications(text, true);
         console.log(`[ai] ─── extraction complete ────────────────`);
         console.log(`[ai] total execution time : ${Date.now() - t0}ms`);
         console.log(`[ai] ──────────────────────────────────────────`);
         return meds;
       } catch (retryErr) {
-        console.log("[ai] Pass 2 strict retry failed:", retryErr);
+        console.log("[ai] Strict retry failed:", retryErr);
         if (retryErr instanceof OllamaError) throw new Error(mapAiError(retryErr.code));
         throw new Error(mapAiError("INVALID_INPUT"));
       }
