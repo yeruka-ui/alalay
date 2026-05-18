@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Alalay is a prescription management mobile app built with Expo (React Native) and TypeScript. It lets users photograph prescriptions, extract medications via Gemini OCR, and manage medication schedules. Targets Filipino users — medication database includes Philippine brand names.
+Alalay is a prescription management mobile app built with Expo (React Native) and TypeScript. It lets users photograph prescriptions, extract medications via local Ollama OCR (gemma4:e4b), and manage medication schedules. Targets Filipino users — medication database includes Philippine brand names.
 
 ## Commands
 
@@ -34,7 +34,7 @@ app/
   (app)/
     _layout.tsx            # Stack with no header
     dashboard.tsx          # Main screen with animated calendar + medication schedule
-    prescription_camera.tsx # Camera/gallery → Gemini OCR → editable medication cards
+    prescription_camera.tsx # Camera/gallery → Ollama OCR (gemma4:e4b, LAN) → editable medication cards
     record_locker.tsx      # Saved medications browser
     alalay_chat.tsx        # Chat interface (placeholder)
     talk_to_alalay.tsx     # Voice → Gemini → medication cards → savePrescription
@@ -50,7 +50,7 @@ app/
 - **Known issue (BUG-12 / T-031):** `<Slot/>` renders unconditionally — not gated on `ready`. Authenticated users see a brief flash of the onboard screen on cold start until T-031 is fixed.
 
 **Key data flow for prescription OCR:**
-`Image capture → base64 → supabase.functions.invoke("analyze-prescription") → Edge Function calls Gemini (server-side key) → parses JSON → returns MedicationItem[] → fuzzy validation (medicationValidator) → MedicationCard list`
+`Image capture → base64 → utils/ai.ts#analyzePrescription → utils/ollama.ts#callOllamaVision → POST EXPO_PUBLIC_OLLAMA_URL/api/generate (gemma4:e4b, LAN Ollama) → utils/parseMedications.ts → MedicationItem[] → fuzzy validation (medicationValidator) → MedicationCard list`
 
 **Key data flow for voice medications:**
 `Audio recording → base64 → supabase.functions.invoke("analyze-audio") → Edge Function calls Gemini → returns MedicationItem[] → MedicationCard list`
@@ -61,7 +61,10 @@ app/
 
 **Backend:** Supabase client configured in `utils/supabase.ts` with AsyncStorage session persistence. Client env vars: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Gemini API key is **server-side only** — set via `npx supabase secrets set GEMINI_API_KEY=...`, never in `.env`.
 
-**AI proxy:** `utils/ai.ts` exposes `analyzePrescription` and `analyzeAudio` — both call Supabase Edge Functions (`supabase/functions/analyze-prescription/` and `supabase/functions/analyze-audio/`). Edge Functions verify the user's auth server-side via `supabase.auth.getUser()` (ES256-safe), then call Gemini internally and return typed `MedicationItem[]`.
+**AI proxy:** `utils/ai.ts` exposes `analyzePrescription` and `analyzeAudio`.
+- `analyzePrescription` calls `utils/ollama.ts` directly (no Edge Function) — POSTs base64 image to a LAN Ollama server (`EXPO_PUBLIC_OLLAMA_URL`, model `gemma4:e4b`). No Gemini, no cloud. Parsing via `utils/parseMedications.ts`.
+- `analyzeAudio` still calls the Supabase Edge Function `analyze-audio`, which verifies JWT via `auth.getUser()` and calls Gemini (`GEMINI_API_KEY` server-side secret).
+- `supabase/functions/analyze-prescription/` is a deprecated 410-Gone stub — safe to redeploy but no longer active in the image path.
 
 **Database schema** defined in `supabase/migration.sql`. Tables: `profiles`, `prescriptions`, `medications`, `medication_schedules`, `medical_records`. All tables have RLS policies scoped to `auth.uid()`. Storage buckets: `prescriptions`, `medical-records`.
 
@@ -87,13 +90,15 @@ app/
 | `components/tabFilterBar.tsx` | Reusable tab/filter bar used on dashboard and record locker |
 | `utils/medicationValidator.ts` | fuse.js fuzzy match against known drug names |
 | `data/medicationDatabase.ts` | ~225 Philippine generic + brand medication names |
-| `utils/ai.ts` | AI proxy — `analyzePrescription` + `analyzeAudio` via Supabase Edge Functions |
+| `utils/ai.ts` | AI proxy — `analyzePrescription` (→ Ollama LAN) + `analyzeAudio` (→ Supabase Edge Function → Gemini) |
+| `utils/ollama.ts` | Ollama client — `callOllamaVision(base64, prompt)`, `OllamaError`, `OLLAMA_PRESCRIPTION_PROMPT`. Reads `EXPO_PUBLIC_OLLAMA_URL`. |
+| `utils/parseMedications.ts` | Client-side JSON parser for model output → `MedicationItem[]`; strips fenced code blocks |
 | `utils/database.ts` | CRUD helpers: `savePrescription` (schedules + notifs), `getSchedulesForDate`, `markScheduleStatus` (DB + cancel notif), etc. |
 | `utils/manilaTime.ts` | Manila TZ helpers: `manilaDateString(d)` (fixes UTC date bug), `combineManilaDateTime(dateStr, timetz)` |
 | `utils/notifications.ts` | expo-notifications glue: channel setup, schedule/cancel/snooze per row, `syncAllPendingNotifications` |
 | `utils/supabase.ts` | Supabase client with AsyncStorage session persistence |
 | `utils/auth.ts` | Auth helpers (signInWithEmail, signUpWithEmail, saveRememberedIdentifier, getRememberedIdentifier). Note: drops `data` from responses — see DEBT-08 / T-038 |
-| `supabase/functions/analyze-prescription/index.ts` | Edge Function: verifies JWT via `auth.getUser()`, image → Gemini → MedicationItem[] |
+| `supabase/functions/analyze-prescription/index.ts` | **Deprecated stub** — returns 410 Gone with `DEPRECATED` code; image OCR is now handled client-side via Ollama |
 | `supabase/functions/analyze-audio/index.ts` | Edge Function: verifies JWT via `auth.getUser()`, audio → Gemini → MedicationItem[] |
 | `supabase/functions/_shared/gemini.ts` | Shared Deno helpers: callGemini, parseMedications, GeminiError |
 | `supabase/config.toml` | Function config: `verify_jwt = false` for both AI functions (gateway auth disabled; in-function auth via GoTrue) |

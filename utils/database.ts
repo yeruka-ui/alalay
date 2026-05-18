@@ -98,11 +98,16 @@ export async function savePrescription(
 
   if (medError) throw medError;
 
-  // Create schedule rows for the next 7 days starting from startDate
+  // Create schedule rows; days comes from each MedicationItem (default 7)
   const allSchedules = (
     await Promise.all(
-      (savedMeds ?? []).map((med) =>
-        createSchedulesForMedication(med.id, startDate, 7)
+      (savedMeds ?? []).map((dbMed, idx) =>
+        createSchedulesForMedication(
+          dbMed.id,
+          userId,
+          startDate,
+          medications[idx]?.days ?? 7,
+        )
       )
     )
   ).flat();
@@ -189,13 +194,10 @@ export async function markScheduleStatus(
 
 export async function createSchedulesForMedication(
   medicationId: number,
-  medicationTime: string | null,
   userId: string,
   startDate: Date,
   days: number = 7
 ): Promise<MedicationSchedule[]> {
-  const userId = await getCurrentUserId();
-
   const { data: med } = await supabase
     .from("medications")
     .select("time, name, dosage, instructions")

@@ -17,6 +17,7 @@ export type MedicationItem = {
   dosage?: string;
   suggestion?: string | null;
   confidence?: "low" | "medium" | "high";
+  days?: number;
 };
 
 type MedicationCardProps = {

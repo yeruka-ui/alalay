@@ -5,6 +5,7 @@ import {
   snoozeNotification,
   syncAllPendingNotifications,
 } from "@/utils/notifications";
+import { warmupOllama } from "@/utils/ollama";
 import { supabase } from "@/utils/supabase";
 import type { Session } from "@supabase/supabase-js";
 import * as Notifications from "expo-notifications";
@@ -79,6 +80,7 @@ export default function RootLayout() {
     configureNotifications().then(() =>
       syncAllPendingNotifications(userId)
     );
+    warmupOllama();
   }, [session, onboardingDone]);
 
   // Reset sync ref on logout so the next login re-syncs

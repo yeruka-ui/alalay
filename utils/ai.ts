@@ -1,5 +1,7 @@
 import type { MedicationItem } from "@/components/MedicationCard";
 import { supabase } from "./supabase";
+import { callOllamaVision, OllamaError, OLLAMA_PRESCRIPTION_PROMPT } from "./ollama";
+import { parseMedications } from "./parseMedications";
 
 type AiErrorCode =
   | "QUOTA"
@@ -70,9 +72,18 @@ async function invokeAiFunction(
 
 export async function analyzePrescription(
   base64: string,
-  mimeType: string,
+  // mimeType kept for signature compatibility; Ollama infers format from image data
+  _mimeType: string,
 ): Promise<MedicationItem[]> {
-  return invokeAiFunction("analyze-prescription", { base64, mimeType });
+  try {
+    const text = await callOllamaVision(base64, OLLAMA_PRESCRIPTION_PROMPT);
+    return parseMedications(text, true);
+  } catch (err) {
+    if (err instanceof OllamaError) {
+      throw new Error(mapAiError(err.code));
+    }
+    throw new Error(mapAiError("UNKNOWN"));
+  }
 }
 
 export async function analyzeAudio(
