@@ -1,7 +1,7 @@
 import type { MedicationItem } from "@/components/MedicationCard";
 import { supabase } from "./supabase";
-import { callOllamaVision, OllamaError, OLLAMA_PRESCRIPTION_PROMPT } from "./ollama";
-import { parseMedications } from "./parseMedications";
+import { callOllamaVision, OllamaError, OLLAMA_PRESCRIPTION_PROMPT, STRICT_RETRY_PREFIX } from "./ollama";
+import { MedicationParseError, parseMedications } from "./parseMedications";
 
 type AiErrorCode =
   | "QUOTA"
@@ -76,12 +76,40 @@ export async function analyzePrescription(
   _mimeType: string,
 ): Promise<MedicationItem[]> {
   try {
-    const text = await callOllamaVision(base64, OLLAMA_PRESCRIPTION_PROMPT);
+    let { text, truncated } = await callOllamaVision(base64, OLLAMA_PRESCRIPTION_PROMPT);
+
+    if (truncated) {
+      console.log("[ai] OCR output truncated — retrying with numCtx=16384");
+      try {
+        ({ text, truncated } = await callOllamaVision(
+          base64,
+          OLLAMA_PRESCRIPTION_PROMPT,
+          { numCtx: 16384 },
+        ));
+        if (truncated) console.log("[ai] Output still truncated at numCtx=16384 — parsing partial result");
+      } catch (retryErr) {
+        console.log("[ai] Context retry failed — parsing partial result:", retryErr);
+      }
+    }
+
     return parseMedications(text, true);
   } catch (err) {
-    if (err instanceof OllamaError) {
-      throw new Error(mapAiError(err.code));
+    if (err instanceof MedicationParseError) {
+      console.log("[ai] OCR refused — retrying with strict prompt");
+      try {
+        const { text } = await callOllamaVision(
+          base64,
+          STRICT_RETRY_PREFIX + OLLAMA_PRESCRIPTION_PROMPT,
+        );
+        return parseMedications(text, true);
+      } catch (retryErr) {
+        console.log("[ai] OCR retry also failed:", retryErr);
+        if (retryErr instanceof OllamaError) throw new Error(mapAiError(retryErr.code));
+        throw new Error(mapAiError("INVALID_INPUT"));
+      }
     }
+    if (err instanceof OllamaError) throw new Error(mapAiError(err.code));
+    if (err instanceof SyntaxError) throw new Error(mapAiError("INVALID_INPUT"));
     throw new Error(mapAiError("UNKNOWN"));
   }
 }

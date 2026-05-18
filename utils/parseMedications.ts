@@ -1,5 +1,12 @@
 import type { MedicationItem } from "@/components/MedicationCard";
 
+export class MedicationParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MedicationParseError";
+  }
+}
+
 const TIMES_BY_FREQUENCY: Record<number, string[]> = {
   1: ["8:00 AM"],
   2: ["8:00 AM", "8:00 PM"],
@@ -30,6 +37,26 @@ export function parseMedications(
     arr = nested ? (nested as unknown[]) : [parsed];
   } else {
     arr = [parsed];
+  }
+
+  // Detect refusal/error-wrapper objects (e.g. {"error":"..."}) and throw
+  // so the caller can retry rather than silently producing "Unknown Medication".
+  const looksLikeMedication = (obj: Record<string, unknown>) =>
+    typeof obj.name === "string" ||
+    typeof obj.frequency === "number" ||
+    typeof obj.days === "number" ||
+    typeof obj.dosage === "string";
+
+  if (
+    arr.length === 1 &&
+    arr[0] !== null &&
+    typeof arr[0] === "object" &&
+    !Array.isArray(arr[0]) &&
+    !looksLikeMedication(arr[0] as Record<string, unknown>)
+  ) {
+    throw new MedicationParseError(
+      `Model returned non-medication object: ${JSON.stringify(arr[0]).slice(0, 200)}`,
+    );
   }
 
   const items: MedicationItem[] = [];

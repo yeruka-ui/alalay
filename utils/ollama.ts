@@ -15,9 +15,10 @@ export class OllamaError extends Error {
   }
 }
 
-export const OLLAMA_PRESCRIPTION_PROMPT = `Analyze this prescription image and extract medications.
+export const OLLAMA_PRESCRIPTION_PROMPT = `Analyze this prescription image and extract ALL medications.
 
-Output a JSON array with ONE object per medication name. Do NOT repeat the same medication — capture frequency and duration instead.
+STEP 1 — Scan the entire image top to bottom. Count every distinct medication name you can see, even if partially legible.
+STEP 2 — Output ONE JSON object per medication. Do NOT stop until every medication from STEP 1 is included.
 
 Each object must have exactly these fields:
 - "name": medication name (string)
@@ -29,18 +30,23 @@ Each object must have exactly these fields:
 
 RULES:
 1. Your ENTIRE response must be a single JSON array. NEVER use {"status":...}, {"error":...}, or any wrapper object.
-2. ONE object per medication. Never duplicate a medication.
+2. ONE object per medication name. Never duplicate.
 3. "frequency" must be an integer (e.g. "3x a day" → 3, "twice daily" → 2, "once daily" → 1).
 4. "days" must be an integer (e.g. "for 7 days" → 7, "for a month" → 30).
 5. If instructions are unclear, use "after meals".
-6. If unreadable, still output the entry with confidence "low".
+6. If partially unreadable, still include the entry with confidence "low".
+7. Include EVERY medication — missing even one is a critical error.
 
 Examples:
 "Lipitor 10mg once daily" → [{"name":"Lipitor","dosage":"10mg","instructions":"after meals","frequency":1,"days":30,"confidence":"medium"}]
-"Amoxicillin 500mg 1 cap 3x a day for 7 days" → [{"name":"Amoxicillin","dosage":"500mg","instructions":"after meals","frequency":3,"days":7,"confidence":"high"}]
-"Metformin 500mg twice daily after meals for 30 days, Amlodipine 5mg once daily for 30 days" → [{"name":"Metformin","dosage":"500mg","instructions":"after meals","frequency":2,"days":30,"confidence":"high"},{"name":"Amlodipine","dosage":"5mg","instructions":"after meals","frequency":1,"days":30,"confidence":"high"}]
+"Amoxicillin 500mg 3x a day for 7 days" → [{"name":"Amoxicillin","dosage":"500mg","instructions":"after meals","frequency":3,"days":7,"confidence":"high"}]
+"Metformin 500mg twice daily, Amlodipine 5mg once daily, Lipitor 10mg once daily" → [{"name":"Metformin","dosage":"500mg","instructions":"after meals","frequency":2,"days":30,"confidence":"high"},{"name":"Amlodipine","dosage":"5mg","instructions":"after meals","frequency":1,"days":30,"confidence":"high"},{"name":"Lipitor","dosage":"10mg","instructions":"after meals","frequency":1,"days":30,"confidence":"high"}]
 
 Output the JSON array only. No explanation, no status, no other text.`;
+
+export const STRICT_RETRY_PREFIX = `STRICT MODE — your previous attempt failed because you produced a non-array object (e.g. {"error":...} or {"status":...}). Output ONLY the JSON array — no explanations, no thinking, no commentary, no error/status/message fields. Begin your response with [ immediately and end with ]. If you cannot read a medication, still include it with "confidence":"low".
+
+`;
 
 const OLLAMA_MODEL = "gemma4:e4b";
 const TIMEOUT_MS = 120_000;
@@ -79,7 +85,8 @@ export async function warmupOllama(): Promise<void> {
 export async function callOllamaVision(
   base64: string,
   prompt: string,
-): Promise<string> {
+  opts?: { numCtx?: number },
+): Promise<{ text: string; truncated: boolean }> {
   const url = process.env.EXPO_PUBLIC_OLLAMA_URL;
   if (!url) {
     throw new OllamaError("UNKNOWN", "EXPO_PUBLIC_OLLAMA_URL not configured", 500);
@@ -100,6 +107,10 @@ export async function callOllamaVision(
         images: [base64],
         stream: false,
         format: "json",
+        options: {
+          num_predict: -1, // no output token cap — required for prescriptions with many medications
+          ...(opts?.numCtx != null ? { num_ctx: opts.numCtx } : {}),
+        },
       }),
       signal: controller.signal,
     });
@@ -130,19 +141,22 @@ export async function callOllamaVision(
   const wallMs = Date.now() - t0;
 
   const ns = (n: unknown) => (typeof n === "number" ? Math.round(n / 1e6) : null);
-  const loadMs   = ns(result?.load_duration);
+  const loadMs = ns(result?.load_duration);
   const promptMs = ns(result?.prompt_eval_duration);
-  const evalMs   = ns(result?.eval_duration);
-  const totalMs  = ns(result?.total_duration) ?? wallMs;
+  const evalMs = ns(result?.eval_duration);
+  const totalMs = ns(result?.total_duration) ?? wallMs;
   const promptTokens = result?.prompt_eval_count ?? "?";
-  const evalTokens   = result?.eval_count ?? "?";
+  const evalTokens = result?.eval_count ?? "?";
   const tokPerSec =
     typeof result?.eval_count === "number" &&
-    typeof result?.eval_duration === "number" &&
-    result.eval_duration > 0
+      typeof result?.eval_duration === "number" &&
+      result.eval_duration > 0
       ? (result.eval_count / (result.eval_duration / 1e9)).toFixed(1)
       : "?";
   const imageSizeKb = Math.round((base64.length * 3) / 4 / 1024);
+
+  const doneReason: string = result?.done_reason ?? "unknown";
+  const truncated = doneReason === "length";
 
   console.log(`[ollama] ─── inference complete ───────────────────`);
   console.log(`[ollama] model        : ${OLLAMA_MODEL}`);
@@ -152,6 +166,7 @@ export async function callOllamaVision(
   console.log(`[ollama] model load   : ${loadMs ?? "?"} ms`);
   console.log(`[ollama] prompt eval  : ${promptMs ?? "?"} ms  (${promptTokens} tokens)`);
   console.log(`[ollama] generation   : ${evalMs ?? "?"} ms  (${evalTokens} tokens · ${tokPerSec} tok/s)`);
+  console.log(`[ollama] done reason  : ${doneReason}${truncated ? " ⚠️  OUTPUT WAS TRUNCATED — increase num_predict" : ""}`);
   console.log(`[ollama] raw response : ${result?.response}`);
   console.log(`[ollama] ──────────────────────────────────────────`);
 
@@ -159,5 +174,5 @@ export async function callOllamaVision(
   if (!text) {
     throw new OllamaError("UPSTREAM", "Empty response from Ollama", 502);
   }
-  return text;
+  return { text, truncated };
 }
