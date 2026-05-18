@@ -5,6 +5,8 @@ import type {
   MedicationSchedule,
   Prescription,
   ProfileUpdate,
+  CareRelationship,
+  Profile,
 } from "@/types/database";
 import { supabase } from "./supabase";
 import { toDbTime } from "./timeFormat";
@@ -143,6 +145,82 @@ export async function getActiveMedications(): Promise<Medication[]> {
   return data ?? [];
 }
 
+// ─── Guardian & Care Relationships ───────────────────────────
+
+export async function getPatientsForGuardian(): Promise<{ relationship: CareRelationship; patient: Profile | null }[]> {
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("care_relationships")
+    .select("*")
+    .eq("guardian_id", userId)
+    .eq("status", "active");
+
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  const patientIds = data.map((r) => r.patient_id);
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .in("auth_id", patientIds);
+
+  if (profileError) throw profileError;
+
+  return data.map((rel) => ({
+    relationship: rel,
+    patient: profiles?.find((p) => p.auth_id === rel.patient_id) ?? null,
+  }));
+}
+
+export async function getPatientActiveMedications(patientId: string): Promise<Medication[]> {
+  const { data, error } = await supabase
+    .from("medications")
+    .select("*")
+    .eq("user_id", patientId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getPatientSchedulesForDate(
+  patientId: string,
+  date: Date,
+): Promise<(MedicationSchedule & { medication: Medication })[]> {
+  const dateStr = manilaDateString(date);
+
+  const { data, error } = await supabase
+    .from("medication_schedules")
+    .select("*, medication:medications(*)")
+    .eq("user_id", patientId)
+    .eq("scheduled_date", dateStr)
+    .order("scheduled_time", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getPatientSchedulesForDateRange(
+  patientId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<(MedicationSchedule & { medication: Medication })[]> {
+  const startStr = manilaDateString(startDate);
+  const endStr = manilaDateString(endDate);
+
+  const { data, error } = await supabase
+    .from("medication_schedules")
+    .select("*, medication:medications(*)")
+    .eq("user_id", patientId)
+    .gte("scheduled_date", startStr)
+    .lte("scheduled_date", endStr)
+    .order("scheduled_time", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Medication Schedules ────────────────────────────────────
 
 export async function getSchedulesForDate(
@@ -156,6 +234,26 @@ export async function getSchedulesForDate(
     .select("*, medication:medications(*)")
     .eq("user_id", userId)
     .eq("scheduled_date", dateStr)
+    .order("scheduled_time", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getSchedulesForDateRange(
+  startDate: Date,
+  endDate: Date,
+): Promise<(MedicationSchedule & { medication: Medication })[]> {
+  const userId = await getCurrentUserId();
+  const startStr = manilaDateString(startDate);
+  const endStr = manilaDateString(endDate);
+
+  const { data, error } = await supabase
+    .from("medication_schedules")
+    .select("*, medication:medications(*)")
+    .eq("user_id", userId)
+    .gte("scheduled_date", startStr)
+    .lte("scheduled_date", endStr)
     .order("scheduled_time", { ascending: true });
 
   if (error) throw error;
@@ -194,7 +292,7 @@ export async function createSchedulesForMedication(
   startDate: Date,
   days: number = 7
 ): Promise<MedicationSchedule[]> {
-  const userId = await getCurrentUserId();
+  // userId is provided in parameters
 
   const { data: med } = await supabase
     .from("medications")

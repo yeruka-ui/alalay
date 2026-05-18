@@ -235,3 +235,65 @@ create policy medical_records_policy on public.medical_records
 -- ============================================================
 alter table public.medication_schedules
   add column if not exists notification_id text;
+
+-- ============================================================
+-- 13. CARE RELATIONSHIPS
+-- Links guardians (caretakers) to patients
+-- ============================================================
+create table public.care_relationships (
+  id bigint generated always as identity primary key,
+  guardian_id uuid not null references auth.users(id) on delete cascade,
+  patient_id uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'active'
+    check (status in ('active', 'pending', 'inactive')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(guardian_id, patient_id)
+);
+
+create index care_rel_guardian_idx on public.care_relationships (guardian_id);
+create index care_rel_patient_idx on public.care_relationships (patient_id);
+
+alter table public.care_relationships enable row level security;
+
+-- Guardians can see their relationships
+create policy care_relationships_guardian_policy on public.care_relationships
+  for all to authenticated
+  using (guardian_id = auth.uid() or patient_id = auth.uid())
+  with check (guardian_id = auth.uid() or patient_id = auth.uid());
+
+-- We also need to update other policies so guardians can read their patients' data.
+-- We'll add read-only policies for guardians on prescriptions, medications, and schedules.
+
+create policy prescriptions_guardian_read on public.prescriptions
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.care_relationships cr
+      where cr.patient_id = prescriptions.user_id
+        and cr.guardian_id = auth.uid()
+        and cr.status = 'active'
+    )
+  );
+
+create policy medications_guardian_read on public.medications
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.care_relationships cr
+      where cr.patient_id = medications.user_id
+        and cr.guardian_id = auth.uid()
+        and cr.status = 'active'
+    )
+  );
+
+create policy schedules_guardian_read on public.medication_schedules
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.care_relationships cr
+      where cr.patient_id = medication_schedules.user_id
+        and cr.guardian_id = auth.uid()
+        and cr.status = 'active'
+    )
+  );

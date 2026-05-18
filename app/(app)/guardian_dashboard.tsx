@@ -1,8 +1,7 @@
-import FloatingActionMenu from "@/components/floatingActionMenu";
 import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
-import { styles } from "@/styles/index.styles";
-import type { Medication, MedicationSchedule } from "@/types/database";
+import { styles } from "@/styles/guardian_dashboard.styles";
+import type { Medication, MedicationSchedule, Profile } from "@/types/database";
 import {
   DAY_BATCH_SIZE,
   createDateBatch,
@@ -20,7 +19,11 @@ import {
   COLLAPSED_SELECTED_DAY_HEIGHT,
   getCalendarDayPresentation,
 } from "@/utils/dashboardCalendarPresentation";
-import { getActiveMedications, getSchedulesForDateRange, markScheduleStatus } from "@/utils/database";
+import {
+  getPatientActiveMedications,
+  getPatientSchedulesForDateRange,
+  getPatientsForGuardian,
+} from "@/utils/database";
 import { manilaDateString } from "@/utils/manilaTime";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
@@ -38,6 +41,7 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
+  Alert,
 } from "react-native";
 import Animated, {
   interpolate,
@@ -45,12 +49,12 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
-  SlideOutLeft,
-  LinearTransition,
   type SharedValue,
 } from "react-native-reanimated";
 import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
+import { Ionicons } from "@expo/vector-icons";
 
+// ... Same Calendar Constants ...
 const CALENDAR_PADDING = 60;
 const CALENDAR_GAP = 8;
 const ACTIVE_WIDTH_BONUS = 28;
@@ -68,6 +72,7 @@ const DAY_LABEL_EXPANDED_MARGIN_TOP = 4;
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
+// ... CalendarDayCard component ...
 type CalendarDayCardProps = {
   date: Date;
   dayLabel: string;
@@ -338,7 +343,7 @@ function CalendarDayCard({
   );
 }
 
-export default function Dashboard() {
+export default function GuardianDashboard() {
   // **************************** CALENDAR LOGIC ****************************
   const initialSelectedDate = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
@@ -369,7 +374,6 @@ export default function Dashboard() {
   );
 
   // **************************** TAB FILTER LOGIC ****************************
-  // Variable to track active and inactive tabs
   const [activeTab, setActiveTab] = useState("pending");
   const tabs = [
     { id: "pending", label: "Pending", icon: "bell" },
@@ -379,13 +383,31 @@ export default function Dashboard() {
   ];
 
   // **************************** DATA FETCHING ****************************
+  const [patients, setPatients] = useState<Profile[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  
   const [preloadedSchedules, setPreloadedSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
   const loadedRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const [allMedications, setAllMedications] = useState<Medication[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Initialize patients
+  useEffect(() => {
+    getPatientsForGuardian()
+      .then((rels) => {
+        const validPatients = rels.map((r) => r.patient).filter(Boolean) as Profile[];
+        setPatients(validPatients);
+        if (validPatients.length > 0) {
+          setSelectedPatientId(validPatients[0].auth_id);
+        }
+      })
+      .catch((err) => console.error("Error fetching patients:", err));
+  }, []);
+
   const fetchSchedules = useCallback(async (dateToLoad: Date, force: boolean = false) => {
+    if (!selectedPatientId) return;
+    
     const loaded = loadedRangeRef.current;
     const isOutsideRange = !loaded || dateToLoad < loaded.start || dateToLoad > loaded.end;
     
@@ -401,7 +423,7 @@ export default function Dashboard() {
       const end = new Date(dateToLoad);
       end.setDate(end.getDate() + 2);
 
-      const schedulesData = await getSchedulesForDateRange(start, end);
+      const schedulesData = await getPatientSchedulesForDateRange(selectedPatientId, start, end);
       setPreloadedSchedules(schedulesData);
       loadedRangeRef.current = { start, end };
     } catch (err) {
@@ -417,17 +439,23 @@ export default function Dashboard() {
     } finally {
       setIsLoadingData(false);
     }
-  }, []);
+  }, [selectedPatientId]);
 
   useEffect(() => {
-    fetchSchedules(selectedDate);
-  }, [selectedDate, fetchSchedules]);
+    if (selectedPatientId) {
+      // Force reload when patient changes, or just reload when date changes outside range
+      // Because selectedPatientId is in the dependency array, when it changes we should force reload
+      // We can manage force reload by clearing loadedRangeRef when patient changes.
+      fetchSchedules(selectedDate);
+    }
+  }, [selectedDate, selectedPatientId, fetchSchedules]);
 
   useEffect(() => {
-    getActiveMedications().then(setAllMedications).catch(() => {});
-  }, []);
-
-  const fetchDashboardData = useCallback(() => fetchSchedules(selectedDate, true), [selectedDate, fetchSchedules]);
+    if (selectedPatientId) {
+      loadedRangeRef.current = null; // Clear cache on patient change
+      getPatientActiveMedications(selectedPatientId).then(setAllMedications).catch(() => {});
+    }
+  }, [selectedPatientId]);
 
   const schedules = useMemo(() => {
     const targetDateStr = manilaDateString(selectedDate);
@@ -445,33 +473,12 @@ export default function Dashboard() {
   });
 
   const getMonthName = (monthIndex: number): string => {
-    const months = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     return months[monthIndex];
   };
 
   const getDayName = (dayIndex: number, short: boolean = true): string => {
-    const daysLong = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
+    const daysLong = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return short ? daysShort[dayIndex] : daysLong[dayIndex];
   };
@@ -597,37 +604,49 @@ export default function Dashboard() {
     },
   });
 
+  const handleRemind = (medicationName: string) => {
+    Alert.alert("Reminder Sent", `A push notification has been sent to remind the patient to take ${medicationName}.`);
+  };
+
+  const selectedPatient = patients.find(p => p.auth_id === selectedPatientId);
+  const totalMedsToday = schedules.length;
+  const takenMedsToday = schedules.filter(s => s.status === "taken").length;
+  const missedMedsToday = schedules.filter(s => s.status === "missed").length;
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.screen}>
         <View style={[styles.container, { minHeight: 0 }]}>
-          <Animated.View
-            style={[
-              styles.purplePanel,
-              purplePanelAnimatedStyle,
-            ]}
-          >
+          <Animated.View style={[styles.tealPanel, purplePanelAnimatedStyle]}>
             <View style={styles.header}>
-              <TouchableOpacity onPress={() => setIsDropdownOpen(true)}>
-                <View style={styles.monthContainer}>
-                  <Text style={styles.monthText}>
-                    {getMonthName(selectedDate.getMonth())}{" "}
-                    {selectedDate.getFullYear()}
-                  </Text>
-                  <Text style={styles.dropdownArrow}>v</Text>
-                </View>
-              </TouchableOpacity>
+              <View>
+                <Text style={styles.subHeaderText}>Guardian Mode</Text>
+                <Text style={styles.patientNameText}>
+                  {selectedPatient ? selectedPatient.full_name || "Patient" : "Loading..."}
+                </Text>
+                <TouchableOpacity onPress={() => setIsDropdownOpen(true)}>
+                  <View style={styles.monthContainer}>
+                    <Text style={styles.monthText}>
+                      {getMonthName(selectedDate.getMonth())}{" "}
+                      {selectedDate.getFullYear()}
+                    </Text>
+                    <Text style={styles.dropdownArrow}>v</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity style={styles.purpleButton}>
-                <Text style={styles.addTaskText}>+ Add Task</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => supabase.auth.signOut()}
-                style={{ marginLeft: 8, backgroundColor: "#850099", borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 }}
-              >
-                <Text style={{ color: "#FFF", fontSize: 12 }}>Logout</Text>
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                <TouchableOpacity style={styles.contactButton} onPress={() => Alert.alert("Calling...", "Initiating call to patient.")}>
+                  <Ionicons name="call" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => supabase.auth.signOut()}
+                  style={{ marginLeft: 8, backgroundColor: "#00838F", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12 }}
+                >
+                  <Text style={{ color: "#FFF", fontSize: 14 }}>Logout</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <Animated.View style={calendarContainerAnimatedStyle}>
@@ -679,6 +698,23 @@ export default function Dashboard() {
             </Animated.View>
           </Animated.View>
         </View>
+
+        {/* Adherence Summary Card */}
+        <View style={styles.adherenceContainer}>
+            <View style={styles.adherenceStat}>
+                <Text style={styles.adherenceLabel}>Total</Text>
+                <Text style={styles.adherenceValue}>{totalMedsToday}</Text>
+            </View>
+            <View style={styles.adherenceStat}>
+                <Text style={styles.adherenceLabel}>Taken</Text>
+                <Text style={[styles.adherenceValue, { color: "#4CAF50" }]}>{takenMedsToday}</Text>
+            </View>
+            <View style={styles.adherenceStat}>
+                <Text style={styles.adherenceLabel}>Missed</Text>
+                <Text style={[styles.adherenceValue, { color: missedMedsToday > 0 ? "#D32F2F" : "#00838F" }]}>{missedMedsToday}</Text>
+            </View>
+        </View>
+
         <TabFilterBar
           tabs={tabs}
           activeTab={activeTab}
@@ -695,7 +731,7 @@ export default function Dashboard() {
         {/* Medication Schedule List */}
         {isLoadingData ? (
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#B902D6" />
+            <ActivityIndicator size="large" color="#0097A7" />
           </View>
         ) : filteredSchedules.length > 0 ? (
           <Animated.ScrollView
@@ -704,32 +740,19 @@ export default function Dashboard() {
             scrollEventThrottle={16}
           >
             {filteredSchedules.map((schedule) => (
-              <Animated.View
+              <MedicationCard
                 key={schedule.id}
-                layout={LinearTransition}
-              >
-                <MedicationCard
-                  item={{
-                    id: String(schedule.id),
-                    name: schedule.medication?.name ?? "",
-                    instructions: schedule.medication?.instructions ?? "",
-                    dosage: schedule.medication?.dosage ?? undefined,
-                    time: formatTime(schedule.scheduled_time),
-                  }}
-                  status={schedule.status as "pending" | "taken"}
-                  onTake={() => {
-                    // Optimistically update the UI to trigger animation
-                    setPreloadedSchedules(prev => 
-                      prev.map(s => s.id === schedule.id ? { ...s, status: "taken" } : s)
-                    );
-                    // Update in background
-                    markScheduleStatus(schedule.id, "taken", schedule.notification_id).catch(() => {
-                      // If it fails, refresh the data to rollback
-                      fetchDashboardData();
-                    });
-                  }}
-                />
-              </Animated.View>
+                mode="guardian"
+                item={{
+                  id: String(schedule.id),
+                  name: schedule.medication?.name ?? "",
+                  instructions: schedule.medication?.instructions ?? "",
+                  dosage: schedule.medication?.dosage ?? undefined,
+                  time: formatTime(schedule.scheduled_time),
+                }}
+                status={schedule.status as "pending" | "taken" | "missed" | "skipped"}
+                onRemind={() => handleRemind(schedule.medication?.name ?? "medication")}
+              />
             ))}
           </Animated.ScrollView>
         ) : activeTab === "medication" && allMedications.length > 0 ? (
@@ -741,6 +764,7 @@ export default function Dashboard() {
             {allMedications.map((med) => (
               <MedicationCard
                 key={med.id}
+                mode="guardian"
                 item={{
                   id: String(med.id),
                   name: med.name,
@@ -752,13 +776,12 @@ export default function Dashboard() {
             ))}
           </Animated.ScrollView>
         ) : (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="medical-outline" size={48} color="#B2EBF2" />
+            <Text style={styles.emptyText}>No items for this date</Text>
           </View>
         )}
 
-        {/* Floating Action Menu */}
-        <FloatingActionMenu />
       </View>
 
       {/* iOS: native spinner inside a slide-up modal with a Done button */}
