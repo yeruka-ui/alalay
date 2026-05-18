@@ -85,7 +85,7 @@ export async function warmupOllama(): Promise<void> {
 export async function callOllamaVision(
   base64: string,
   prompt: string,
-  opts?: { numCtx?: number; jsonFormat?: boolean },
+  opts?: { numCtx?: number; jsonFormat?: boolean; numPredict?: number },
 ): Promise<{ text: string; truncated: boolean }> {
   const url = process.env.EXPO_PUBLIC_OLLAMA_URL;
   if (!url) {
@@ -108,7 +108,7 @@ export async function callOllamaVision(
         stream: false,
         ...(opts?.jsonFormat !== false ? { format: "json" } : {}),
         options: {
-          num_predict: -1, // no output token cap — required for prescriptions with many medications
+          num_predict: -1, // cap output tokens to prevent whitespace bleed
           ...(opts?.numCtx != null ? { num_ctx: opts.numCtx } : {}),
         },
       }),
@@ -184,7 +184,7 @@ export const OLLAMA_EXTRACT_PROMPT = `Read this prescription image and transcrib
 List each medication line by line with its dosage, instructions, and duration.
 For text that is hard to read, write your best guess — do not skip anything.
 
-Output the transcribed text only. No JSON, no formatting, no commentary.`;
+Output the transcribed text only. No JSON, no formatting, no commentary. Do not output any empty lines or whitespace padding. Stop generating immediately after the last word.`;
 
 export const makeOllamaStructurePrompt = (rawText: string) =>
   `You are a pharmacist. From the prescription text below, extract all medications and return a JSON array.

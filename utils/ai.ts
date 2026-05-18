@@ -75,6 +75,7 @@ export async function analyzePrescription(
   // mimeType kept for signature compatibility; Ollama infers format from image data
   _mimeType: string,
 ): Promise<MedicationItem[]> {
+  const t0 = Date.now();
   // Pass 1 — extract raw text from the image (no JSON format, free-form transcription)
   let rawText: string;
   try {
@@ -101,13 +102,21 @@ export async function analyzePrescription(
       }
     }
 
-    return parseMedications(text, true);
+    const meds = parseMedications(text, true);
+    console.log(`[ai] ─── extraction complete ────────────────`);
+    console.log(`[ai] total execution time : ${Date.now() - t0}ms`);
+    console.log(`[ai] ──────────────────────────────────────────`);
+    return meds;
   } catch (err) {
     if (err instanceof MedicationParseError) {
       console.log("[ai] Pass 2 refused — retrying with strict prompt");
       try {
         const { text } = await callOllama(STRICT_RETRY_PREFIX + makeOllamaStructurePrompt(rawText));
-        return parseMedications(text, true);
+        const meds = parseMedications(text, true);
+        console.log(`[ai] ─── extraction complete ────────────────`);
+        console.log(`[ai] total execution time : ${Date.now() - t0}ms`);
+        console.log(`[ai] ──────────────────────────────────────────`);
+        return meds;
       } catch (retryErr) {
         console.log("[ai] Pass 2 strict retry failed:", retryErr);
         if (retryErr instanceof OllamaError) throw new Error(mapAiError(retryErr.code));
