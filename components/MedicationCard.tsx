@@ -7,7 +7,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+  interpolateColor,
+} from "react-native-reanimated";
 
 export type MedicationItem = {
   id: string;
@@ -30,8 +38,10 @@ type MedicationCardProps = {
   ) => void;
   onAcceptSuggestion?: (id: string, suggestedName: string) => void;
   onDismissSuggestion?: (id: string) => void;
-  status?: "pending" | "taken";
+  status?: "pending" | "taken" | "missed" | "skipped";
   onTake?: () => void;
+  mode?: "patient" | "guardian";
+  onRemind?: () => void;
 };
 
 export default function MedicationCard({
@@ -42,9 +52,36 @@ export default function MedicationCard({
   onDismissSuggestion,
   status,
   onTake,
+  mode = "patient",
+  onRemind,
 }: MedicationCardProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [draft, setDraft] = useState(item);
+
+  const takeAnimation = useSharedValue(0);
+  const { width: screenWidth } = Dimensions.get("window");
+
+  const animatedCardStyle = useAnimatedStyle(() => {
+    const bgColor = interpolateColor(
+      takeAnimation.value,
+      [0, 1],
+      ["#fcf9fcff", "#d4edda"]
+    );
+    return {
+      transform: [{ translateX: -takeAnimation.value * screenWidth }],
+      backgroundColor: bgColor,
+      zIndex: takeAnimation.value > 0 ? 999 : 1,
+      elevation: takeAnimation.value > 0 ? 10 : 0,
+    };
+  });
+
+  const handleTake = () => {
+    takeAnimation.value = withTiming(1, { duration: 300 }, (finished) => {
+      if (finished && onTake) {
+        runOnJS(onTake)();
+      }
+    });
+  };
 
   const handleEdit = () => {
     setDraft(item);
@@ -93,10 +130,11 @@ export default function MedicationCard({
 
   return (
     <>
-      <View
+      <Animated.View
         style={[
           styles.card,
           { borderLeftWidth: 4, borderLeftColor: confidenceBorderColor },
+          animatedCardStyle,
         ]}
       >
         <View style={styles.content}>
@@ -141,19 +179,29 @@ export default function MedicationCard({
               <Text style={styles.timeText}>{item.time}</Text>
             </View>
           ) : null}
-          {status === "pending" && onTake ? (
-            <TouchableOpacity style={styles.editButton} onPress={onTake}>
+          {status === "pending" && mode === "patient" && onTake ? (
+            <TouchableOpacity style={styles.editButton} onPress={handleTake}>
               <Text style={styles.editButtonText}>Take</Text>
+            </TouchableOpacity>
+          ) : status === "pending" && mode === "guardian" && onRemind ? (
+            <TouchableOpacity style={styles.remindButton} onPress={onRemind}>
+              <Text style={styles.remindButtonText}>Remind</Text>
             </TouchableOpacity>
           ) : status === "taken" ? (
             <Text style={styles.takenText}>✓ Taken</Text>
-          ) : onEdit ? (
+          ) : status === "missed" ? (
+            <Text style={styles.missedText}>✗ Missed</Text>
+          ) : status === "skipped" ? (
+            <Text style={styles.skippedText}>- Skipped</Text>
+          ) : onEdit && mode === "patient" ? (
             <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
+          ) : status === "pending" && mode === "guardian" ? (
+            <Text style={styles.pendingText}>Pending</Text>
           ) : null}
         </View>
-      </View>
+      </Animated.View>
 
       <Modal
         visible={modalVisible}
@@ -387,5 +435,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#CC4444",
     fontWeight: "600",
+  },
+  remindButton: {
+    backgroundColor: "#0288D1",
+    borderRadius: 50,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+  },
+  remindButtonText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  missedText: {
+    color: "#D32F2F",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  skippedText: {
+    color: "#757575",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  pendingText: {
+    color: "#F57C00",
+    fontWeight: "600",
+    fontSize: 13,
   },
 });

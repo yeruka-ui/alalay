@@ -20,7 +20,8 @@ import {
   COLLAPSED_SELECTED_DAY_HEIGHT,
   getCalendarDayPresentation,
 } from "@/utils/dashboardCalendarPresentation";
-import { getActiveMedications, getSchedulesForDate, markScheduleStatus } from "@/utils/database";
+import { getActiveMedications, getSchedulesForDateRange, markScheduleStatus } from "@/utils/database";
+import { manilaDateString } from "@/utils/manilaTime";
 import { supabase } from "@/utils/supabase";
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -44,6 +45,8 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  SlideOutLeft,
+  LinearTransition,
   type SharedValue,
 } from "react-native-reanimated";
 import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
@@ -376,18 +379,31 @@ export default function Dashboard() {
   ];
 
   // **************************** DATA FETCHING ****************************
-  const [schedules, setSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
+  const [preloadedSchedules, setPreloadedSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
+  const loadedRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const [allMedications, setAllMedications] = useState<Medication[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const fetchSchedules = useCallback(async () => {
-    setSchedules([]);
-    setIsLoadingData(true);
+  const fetchSchedules = useCallback(async (dateToLoad: Date, force: boolean = false) => {
+    const loaded = loadedRangeRef.current;
+    const isOutsideRange = !loaded || dateToLoad < loaded.start || dateToLoad > loaded.end;
+    
+    if (!isOutsideRange && !force) return;
+    
+    if (isOutsideRange) {
+      setIsLoadingData(true);
+    }
     setFetchError(null);
     try {
-      const schedulesData = await getSchedulesForDate(selectedDate);
-      setSchedules(schedulesData);
+      const start = new Date(dateToLoad);
+      start.setDate(start.getDate() - 2);
+      const end = new Date(dateToLoad);
+      end.setDate(end.getDate() + 2);
+
+      const schedulesData = await getSchedulesForDateRange(start, end);
+      setPreloadedSchedules(schedulesData);
+      loadedRangeRef.current = { start, end };
     } catch (err) {
       const isAuthError =
         err instanceof Error &&
@@ -401,17 +417,22 @@ export default function Dashboard() {
     } finally {
       setIsLoadingData(false);
     }
-  }, [selectedDate]);
+  }, []);
 
   useEffect(() => {
-    fetchSchedules();
-  }, [fetchSchedules]);
+    fetchSchedules(selectedDate);
+  }, [selectedDate, fetchSchedules]);
 
   useEffect(() => {
     getActiveMedications().then(setAllMedications).catch(() => {});
   }, []);
 
-  const fetchDashboardData = fetchSchedules;
+  const fetchDashboardData = useCallback(() => fetchSchedules(selectedDate, true), [selectedDate, fetchSchedules]);
+
+  const schedules = useMemo(() => {
+    const targetDateStr = manilaDateString(selectedDate);
+    return preloadedSchedules.filter((s) => s.scheduled_date === targetDateStr);
+  }, [preloadedSchedules, selectedDate]);
 
   // Filter data based on active tab
   const filteredSchedules = schedules.filter((s) => {
@@ -683,21 +704,32 @@ export default function Dashboard() {
             scrollEventThrottle={16}
           >
             {filteredSchedules.map((schedule) => (
-              <MedicationCard
+              <Animated.View
                 key={schedule.id}
-                item={{
-                  id: String(schedule.id),
-                  name: schedule.medication?.name ?? "",
-                  instructions: schedule.medication?.instructions ?? "",
-                  dosage: schedule.medication?.dosage ?? undefined,
-                  time: formatTime(schedule.scheduled_time),
-                }}
-                status={schedule.status as "pending" | "taken"}
-                onTake={async () => {
-                  await markScheduleStatus(schedule.id, "taken", schedule.notification_id);
-                  fetchDashboardData();
-                }}
-              />
+                layout={LinearTransition}
+              >
+                <MedicationCard
+                  item={{
+                    id: String(schedule.id),
+                    name: schedule.medication?.name ?? "",
+                    instructions: schedule.medication?.instructions ?? "",
+                    dosage: schedule.medication?.dosage ?? undefined,
+                    time: formatTime(schedule.scheduled_time),
+                  }}
+                  status={schedule.status as "pending" | "taken"}
+                  onTake={() => {
+                    // Optimistically update the UI to trigger animation
+                    setPreloadedSchedules(prev => 
+                      prev.map(s => s.id === schedule.id ? { ...s, status: "taken" } : s)
+                    );
+                    // Update in background
+                    markScheduleStatus(schedule.id, "taken", schedule.notification_id).catch(() => {
+                      // If it fails, refresh the data to rollback
+                      fetchDashboardData();
+                    });
+                  }}
+                />
+              </Animated.View>
             ))}
           </Animated.ScrollView>
         ) : activeTab === "medication" && allMedications.length > 0 ? (

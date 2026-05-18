@@ -73,3 +73,14 @@ export type MedicationScheduleInsert = Omit<
   "id" | "created_at" | "status" | "taken_at"
 >;
 export type MedicalRecordInsert = Omit<MedicalRecord, "id" | "created_at">;
+
+export type CareRelationship = {
+  id: number;
+  guardian_id: string;
+  patient_id: string;
+  status: "active" | "pending" | "inactive";
+  created_at: string;
+  updated_at: string;
+};
+
+export type CareRelationshipInsert = Omit<CareRelationship, "id" | "created_at" | "updated_at">;
