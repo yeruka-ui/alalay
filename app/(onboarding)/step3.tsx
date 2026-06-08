@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -35,6 +36,8 @@ export default function OnboardingStep3() {
   const { width, height } = useWindowDimensions();
   const [selected, setSelected] = useState<string[]>([]);
   const [noneSelected, setNoneSelected] = useState(false);
+  const [allergyInput, setAllergyInput] = useState("");
+  const [allergies, setAllergies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const toggleCondition = (condition: string) => {
@@ -51,6 +54,18 @@ export default function OnboardingStep3() {
     setNoneSelected((prev) => !prev);
   };
 
+  const addAllergy = () => {
+    const trimmed = allergyInput.trim();
+    if (trimmed.length > 0 && !allergies.includes(trimmed)) {
+      setAllergies((prev) => [...prev, trimmed]);
+    }
+    setAllergyInput("");
+  };
+
+  const removeAllergy = (item: string) => {
+    setAllergies((prev) => prev.filter((a) => a !== item));
+  };
+
   const canContinue = selected.length > 0 || noneSelected;
 
   const handleNext = async () => {
@@ -58,10 +73,11 @@ export default function OnboardingStep3() {
     try {
       await upsertOnboardingStep({
         health_conditions: noneSelected ? [] : selected,
+        drug_allergies: allergies,
       });
     } finally {
       setLoading(false);
-      router.push("/(onboarding)/done");
+      router.push("/(onboarding)/step4");
     }
   };
 
@@ -78,7 +94,7 @@ export default function OnboardingStep3() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.progressRow}>
-          {[0, 1, 2].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={[styles.dot, i === 2 && styles.dotActive]} />
           ))}
         </View>
@@ -123,6 +139,41 @@ export default function OnboardingStep3() {
               </Text>
             </Pressable>
           </View>
+        </View>
+
+        {/* Drug allergy input */}
+        <View style={{ marginTop: 28 }}>
+          <Text style={styles.inputLabel}>Known Drug Allergies (optional)</Text>
+          <View style={styles.allergyRow}>
+            <TextInput
+              style={[styles.textInput, { flex: 1, marginBottom: 0 }]}
+              value={allergyInput}
+              onChangeText={setAllergyInput}
+              placeholder="e.g. Penicillin"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
+              maxLength={100}
+              onSubmitEditing={addAllergy}
+              returnKeyType="done"
+            />
+            <Pressable style={styles.allergyAddBtn} onPress={addAllergy}>
+              <Text style={styles.allergyAddBtnText}>+ Add</Text>
+            </Pressable>
+          </View>
+          {allergies.length > 0 && (
+            <View style={styles.conditionsGrid}>
+              {allergies.map((a) => (
+                <Pressable
+                  key={a}
+                  style={[styles.chip, styles.chipSelected, { flexDirection: "row", gap: 6 }]}
+                  onPress={() => removeAllergy(a)}
+                >
+                  <Text style={styles.chipTextSelected}>{a}</Text>
+                  <Text style={[styles.chipTextSelected, { opacity: 0.7 }]}>✕</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         <Pressable

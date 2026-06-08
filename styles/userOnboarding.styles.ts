@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native";
+import { bold, fs, s } from "@/utils/scale";
 
 export const styles = StyleSheet.create({
   screen: {
@@ -7,8 +8,8 @@ export const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 48,
+    paddingHorizontal: s(24),
+    paddingBottom: s(48),
   },
 
   // ── Progress dots ───────────────────────────────────────────
@@ -16,40 +17,40 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 60,
-    marginBottom: 32,
-    gap: 8,
+    marginTop: s(60),
+    marginBottom: s(32),
+    gap: s(8),
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: s(8),
+    height: s(8),
+    borderRadius: s(4),
     backgroundColor: "#E6ADEF",
   },
   dotActive: {
-    width: 24,
-    borderRadius: 4,
+    width: s(24),
+    borderRadius: s(4),
     backgroundColor: "#B902D6",
   },
 
   // ── Inputs ──────────────────────────────────────────────────
   inputLabel: {
-    fontSize: 14,
+    fontSize: fs(14),
     color: "#850099",
-    fontWeight: "600",
-    marginBottom: 8,
-    marginLeft: 4,
+    ...bold,
+    marginBottom: s(8),
+    marginLeft: s(4),
   },
   textInput: {
-    height: 52,
+    height: s(52),
     backgroundColor: "#F5E6FF",
-    borderRadius: 26,
-    paddingHorizontal: 20,
-    fontSize: 16,
+    borderRadius: s(26),
+    paddingHorizontal: s(20),
+    fontSize: fs(16),
     color: "#333",
     borderWidth: 2,
     borderColor: "transparent",
-    marginBottom: 4,
+    marginBottom: s(4),
   },
   textInputFocused: {
     borderColor: "#B902D6",
@@ -58,16 +59,16 @@ export const styles = StyleSheet.create({
 
   // ── Birthday button ─────────────────────────────────────────
   dateButton: {
-    height: 52,
+    height: s(52),
     backgroundColor: "#F5E6FF",
-    borderRadius: 26,
-    paddingHorizontal: 20,
+    borderRadius: s(26),
+    paddingHorizontal: s(20),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   dateButtonText: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: "#333",
   },
   dateButtonPlaceholder: {
@@ -78,13 +79,13 @@ export const styles = StyleSheet.create({
   conditionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4,
+    gap: s(8),
+    marginTop: s(4),
   },
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: s(16),
+    paddingVertical: s(10),
+    borderRadius: s(20),
     backgroundColor: "#F5E6FF",
     borderWidth: 1.5,
     borderColor: "#E6ADEF",
@@ -94,7 +95,7 @@ export const styles = StyleSheet.create({
     borderColor: "#B902D6",
   },
   chipText: {
-    fontSize: 13,
+    fontSize: fs(13),
     color: "#850099",
     fontWeight: "500",
   },
@@ -105,28 +106,49 @@ export const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
 
-  // ── Buttons ──────────────────────────────────────────────────
-  nextButton: {
-    height: 56,
+  // ── Drug allergy input row ───────────────────────────────────
+  allergyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: s(8),
+    marginBottom: s(8),
+  },
+  allergyAddBtn: {
+    height: s(52),
+    paddingHorizontal: s(18),
     backgroundColor: "#B902D6",
-    borderRadius: 28,
+    borderRadius: s(26),
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 32,
+  },
+  allergyAddBtnText: {
+    color: "#ffffff",
+    fontSize: fs(14),
+    ...bold,
+  },
+
+  // ── Buttons ──────────────────────────────────────────────────
+  nextButton: {
+    height: s(56),
+    backgroundColor: "#B902D6",
+    borderRadius: s(28),
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: s(32),
   },
   nextButtonDisabled: {
     opacity: 0.45,
   },
   nextButtonText: {
     color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: fs(16),
+    ...bold,
   },
   skipText: {
     textAlign: "center",
     color: "#939292",
-    fontSize: 14,
-    marginTop: 14,
+    fontSize: fs(14),
+    marginTop: s(14),
   },
 
   // ── Done screen ──────────────────────────────────────────────
@@ -134,22 +156,22 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: s(24),
+    paddingBottom: s(40),
   },
   doneTitle: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: fs(28),
+    ...bold,
     color: "#850099",
-    marginTop: 24,
-    marginBottom: 8,
+    marginTop: s(24),
+    marginBottom: s(8),
     textAlign: "center",
   },
   doneSubtitle: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: "#555",
     textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 40,
+    lineHeight: fs(24),
+    marginBottom: s(40),
   },
 });

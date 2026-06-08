@@ -20,6 +20,28 @@
 
 ## Recent Changes
 
+### 2026-06-08 — Android Font, Dashboard UI, Appointments + Upcoming Tab
+
+✅ **Android bold rendering fixed** — `@expo-google-fonts/inter` installed. `Inter_400Regular` + `Inter_800ExtraBold` loaded in root `_layout.tsx`. `Text.defaultProps` set to `Inter_400Regular` on Android so all text uses Inter globally. `bold` helper in `utils/scale.ts` uses `Inter_800ExtraBold` on Android, `fontWeight: "bold"` on iOS. Font scale adjusted by −2px on Android via `fs()`.
+✅ **Dropdown arrow** — Replaced literal `"v"` text with `Ionicons chevron-down` in dashboard header. Unused `dropdownArrow` style removed.
+✅ **T-018 / BUG-03 fixed** — Appointments tab fully implemented. `Appointment` type added to `types/database.ts`. `supabase/migration_v3.sql` creates the `appointments` table with RLS. `getAllPendingSchedules()` and `getAppointments()` added to `utils/database.ts`. Mock data added: 6 medications, 7-day pending schedule spread, 2 appointments.
+✅ **Upcoming tab added** — New 5th tab shows all pending medication schedules + upcoming appointments merged and sorted by date, grouped into per-day sections (Medications / Appointments) with compact rows. Default tab remains Pending.
+✅ **Dashboard layout tightened** — Purple panel bottom padding reduced (35→16 expanded, 18→8 collapsed). 2px padding wrapper added below the purple panel for screen-edge breathing room.
+
+---
+
+### 2026-06-08 — Onboarding Expansion: Steps 4 & 5 + Drug Allergies (T-048)
+
+✅ **supabase/migration_v2.sql** — New migration adds 7 columns to `profiles`: `drug_allergies text[]`, `doctor_name`, `doctor_clinic`, `doctor_contact`, `emergency_name`, `emergency_relation`, `emergency_phone`. Run via Supabase SQL editor before testing.
+✅ **types/database.ts** — `Profile` type and `ProfileUpdate` extended with all 7 new fields.
+✅ **app/(onboarding)/step3.tsx** — Added drug allergy chip input (free-text + `+ Add` button, tap chip to remove). Saves `drug_allergies` array alongside health conditions. Navigates to new step4 instead of done.
+✅ **app/(onboarding)/step4.tsx** (NEW) — Doctor info form: name, clinic, contact number. All optional, saves via `upsertOnboardingStep`. Progress dot 4/5. Navigates to step5.
+✅ **app/(onboarding)/step5.tsx** (NEW) — Emergency contact form: name, relationship chips (7 presets), phone. All optional. Progress dot 5/5. Navigates to done.
+✅ **Progress dots** — All 5 onboarding steps now render a 5-dot progress indicator with the active step highlighted.
+✅ **styles/userOnboarding.styles.ts** — Added `allergyRow`, `allergyAddBtn`, `allergyAddBtnText` styles.
+
+---
+
 ### 2026-04-26 — Phase 0 Core Flows Complete + Local Notifications (T-001, T-002, T-021)
 
 ✅ **T-001 / BUG-01 fixed:** Voice flow (`app/(app)/talk_to_alalay.tsx`) now calls `savePrescription` with loading state, error handling, and start date picker. File also moved into `(app)` route group.  
@@ -209,12 +231,9 @@ All `console.log` calls with PII (`email`, navigation timing) removed from `logi
 
 ---
 
-### BUG-03 — `appointments` Tab Is Entirely Non-Functional
-**Severity: Medium**
+### ~~BUG-03~~ — `appointments` Tab Non-Functional ✅ Fixed 2026-06-08 (T-018)
 
-Dashboard has an "appointments" tab with `id: "appointments"` but no filter logic and no schema table.
-
-**Fix:** Remove the tab or create the `appointments` table and filter logic.
+`appointments` table created (`migration_v3.sql`), `Appointment` type added, `getAppointments()` wired to dashboard. Tab shows doctor visits and lab tests. Add-appointment UI tracked as T-049.
 
 ---
 

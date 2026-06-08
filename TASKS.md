@@ -179,10 +179,21 @@
 
 ---
 
-### [T-018] Fix: Remove or implement `appointments` tab
-**File:** `app/dashboard.tsx:34`, `supabase/migration.sql`  
-**Success criteria (remove option):** Delete the `appointments` entry from `tabs` array.  
-**Success criteria (implement option):** Add `appointments` table, filter logic, basic add-appointment UI.
+### [x] [T-018] Fix: Implement `appointments` tab + Upcoming view
+**Done 2026-06-08**
+- `types/database.ts` — `Appointment` type added (`doctor_visit | lab_test | follow_up | other`, `upcoming | completed | cancelled`)
+- `supabase/migration_v3.sql` — New `appointments` table with RLS scoped to `auth.uid()`
+- `utils/database.ts` — `getAllPendingSchedules()` (all pending from today) + `getAppointments()` (upcoming only)
+- `utils/mockData.ts` — `MOCK_APPOINTMENTS` (2 entries) + `getMockAllPendingSchedules()` (7-day rotating schedule)
+- `app/(app)/dashboard.tsx` — 5-tab bar: Upcoming / Pending / Medication / Appts / Done. Upcoming tab shows pending med schedules + appointments merged, grouped by date with compressed section rows. Appointments tab shows doctor visits and lab tests only.
+- `styles/index.styles.ts` — `upcomingGroup`, `upcomingSection`, `upcomingRow`, `apptCard` styles added
+
+---
+
+### [T-049] Add: Create/edit appointment UI
+**File:** `app/(app)/dashboard.tsx` or new `app/(app)/add_appointment.tsx`
+**Description:** Appointments tab shows data but has no way to add or edit appointments. Need a form (title, type picker, doctor name, location, date/time, notes) that inserts into the `appointments` table via a new `saveAppointment()` helper.
+**Success criteria:** Tapping a "+" button on the Appointments tab opens the form. Saving writes to DB and refreshes the list.
 
 ---
 
@@ -289,6 +300,18 @@ Implement with `expo-auth-session` + Google Identity Services and Sign in with A
 ### [T-046] Add: Magic link / OTP + `alalay://` deep-link handler
 **Files:** `utils/auth.ts`, `app/_layout.tsx` or `app/(auth)/callback.tsx`  
 Implement `signInWithOtp` + a deep-link listener that calls `supabase.auth.exchangeCodeForSession()`. Required for PLANS Phase 1.1 magic link deliverable and for SEC-09 fix.
+
+### [x] [T-048] Add: Expanded onboarding — drug allergies, doctor info, emergency contact
+**Done 2026-06-08**
+- `supabase/migration_v2.sql`: 7 new columns on `profiles`
+- `types/database.ts`: `Profile` + `ProfileUpdate` updated
+- `app/(onboarding)/step3.tsx`: drug allergy chip input; navigates to step4
+- `app/(onboarding)/step4.tsx` (NEW): doctor name / clinic / contact
+- `app/(onboarding)/step5.tsx` (NEW): emergency contact name / relation / phone
+- Progress dots updated to 5 across all steps
+- `styles/userOnboarding.styles.ts`: allergy row styles added
+
+---
 
 ### [T-047] Add: Password strength rules
 **File:** `app/(auth)/signup.tsx:44`  

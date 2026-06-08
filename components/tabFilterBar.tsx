@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { bold, fs, s } from "@/utils/scale";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -60,7 +61,7 @@ export default function TabFilterBar({ tabs, activeTab, onTabChange }: Props) {
           >
             <Feather
               name={tab.icon as any}
-              size={20}
+              size={s(16)}
               color={isActive ? "#CA0DE7" : "#FD89FB"}
             />
             <Text style={isActive ? styles.labelActive : styles.labelInactive}>
@@ -77,16 +78,17 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 4,
+    padding: s(4),
     backgroundColor: "#F5E6FF",
-    margin: 12,
+    marginHorizontal: s(12),
+    marginVertical: s(8),
     borderRadius: 50,
     position: "relative",
   },
   slidingPill: {
     position: "absolute",
-    top: 4,
-    bottom: 4,
+    top: s(4),
+    bottom: s(4),
     backgroundColor: "#ffffffb6",
     borderRadius: 50,
     shadowColor: "#ad9d9d",
@@ -98,14 +100,18 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: "center",
-    padding: 10,
+    paddingVertical: s(8),
+    paddingHorizontal: s(4),
   },
   labelActive: {
     color: "#CA0DE7",
-    fontSize: 11,
+    fontSize: fs(11),
+    ...bold,
+    marginTop: s(2),
   },
   labelInactive: {
     color: "#FD89FB",
-    fontSize: 11,
+    fontSize: fs(11),
+    marginTop: s(2),
   },
 });

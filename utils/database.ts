@@ -1,5 +1,6 @@
 import type { MedicationItem } from "@/components/MedicationCard";
 import type {
+  Appointment,
   MedicalRecord,
   Medication,
   MedicationSchedule,
@@ -10,10 +11,21 @@ import { supabase } from "./supabase";
 import { toDbTime } from "./timeFormat";
 import { manilaDateString } from "./manilaTime";
 import { cancelNotificationFor, scheduleNotificationFor } from "./notifications";
+import {
+  USE_MOCK,
+  MOCK_USER_ID,
+  MOCK_MEDICATIONS,
+  MOCK_PRESCRIPTION,
+  MOCK_MEDICAL_RECORDS,
+  MOCK_APPOINTMENTS,
+  getMockSchedulesForDate,
+  getMockAllPendingSchedules,
+} from "./mockData";
 
 // ─── Auth Helpers ────────────────────────────────────────────
 
 export async function getCurrentUserId(): Promise<string> {
+  if (USE_MOCK) return MOCK_USER_ID;
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -24,6 +36,7 @@ export async function getCurrentUserId(): Promise<string> {
 // ─── Profile / Onboarding ────────────────────────────────────
 
 export async function checkOnboardingComplete(): Promise<boolean> {
+  if (USE_MOCK) return true; // skip onboarding, go straight to dashboard
   try {
     const userId = await getCurrentUserId();
     const { data } = await supabase
@@ -38,6 +51,7 @@ export async function checkOnboardingComplete(): Promise<boolean> {
 }
 
 export async function upsertOnboardingStep(updates: ProfileUpdate): Promise<void> {
+  if (USE_MOCK) return;
   const userId = await getCurrentUserId();
   const { error } = await supabase
     .from("profiles")
@@ -46,6 +60,7 @@ export async function upsertOnboardingStep(updates: ProfileUpdate): Promise<void
 }
 
 export async function markOnboardingComplete(): Promise<void> {
+  if (USE_MOCK) return;
   const userId = await getCurrentUserId();
   const { error } = await supabase
     .from("profiles")
@@ -62,6 +77,7 @@ export async function savePrescription(
   source: "camera" | "gallery" | "manual" = "camera",
   startDate: Date = new Date(),
 ): Promise<{ prescription: Prescription; medications: Medication[] }> {
+  if (USE_MOCK) return { prescription: MOCK_PRESCRIPTION, medications: MOCK_MEDICATIONS };
   const userId = await getCurrentUserId();
 
   // Insert prescription
@@ -130,6 +146,7 @@ export async function savePrescription(
 }
 
 export async function getActiveMedications(): Promise<Medication[]> {
+  if (USE_MOCK) return MOCK_MEDICATIONS;
   const userId = await getCurrentUserId();
 
   const { data, error } = await supabase
@@ -148,6 +165,7 @@ export async function getActiveMedications(): Promise<Medication[]> {
 export async function getSchedulesForDate(
   date: Date,
 ): Promise<(MedicationSchedule & { medication: Medication })[]> {
+  if (USE_MOCK) return getMockSchedulesForDate(manilaDateString(date));
   const userId = await getCurrentUserId();
   const dateStr = manilaDateString(date);
 
@@ -158,6 +176,40 @@ export async function getSchedulesForDate(
     .eq("scheduled_date", dateStr)
     .order("scheduled_time", { ascending: true });
 
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getAllPendingSchedules(): Promise<
+  (MedicationSchedule & { medication: Medication })[]
+> {
+  if (USE_MOCK) return getMockAllPendingSchedules();
+  const userId = await getCurrentUserId();
+  const today = manilaDateString(new Date());
+  const { data, error } = await supabase
+    .from("medication_schedules")
+    .select("*, medication:medications(*)")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .gte("scheduled_date", today)
+    .order("scheduled_date", { ascending: true })
+    .order("scheduled_time", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getAppointments(): Promise<Appointment[]> {
+  if (USE_MOCK) return MOCK_APPOINTMENTS;
+  const userId = await getCurrentUserId();
+  const today = manilaDateString(new Date());
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "upcoming")
+    .gte("appointment_date", today)
+    .order("appointment_date", { ascending: true })
+    .order("appointment_time", { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
@@ -183,14 +235,13 @@ export async function markScheduleStatus(
   status: "taken" | "missed" | "skipped",
   notificationId?: string | null
 ): Promise<void> {
+  if (USE_MOCK) return; // no-op in mock mode; UI state is managed locally in the screen
   await updateScheduleStatus(scheduleId, status);
   await cancelNotificationFor(scheduleId, notificationId ?? null);
 }
 
 export async function createSchedulesForMedication(
   medicationId: number,
-  medicationTime: string | null,
-  userId: string,
   startDate: Date,
   days: number = 7
 ): Promise<MedicationSchedule[]> {
@@ -230,6 +281,7 @@ export async function saveMedicalRecord(
   title?: string,
   notes?: string,
 ): Promise<MedicalRecord> {
+  if (USE_MOCK) return MOCK_MEDICAL_RECORDS[0];
   const userId = await getCurrentUserId();
 
   const { data, error } = await supabase
@@ -251,6 +303,9 @@ export async function saveMedicalRecord(
 export async function getMedicalRecords(
   recordType?: string,
 ): Promise<MedicalRecord[]> {
+  if (USE_MOCK) return recordType
+    ? MOCK_MEDICAL_RECORDS.filter((r) => r.record_type === recordType)
+    : MOCK_MEDICAL_RECORDS;
   const userId = await getCurrentUserId();
 
   let query = supabase
@@ -275,6 +330,7 @@ export async function uploadFile(
   fileUri: string,
   fileName: string,
 ): Promise<string> {
+  if (USE_MOCK) return `mock/${bucket}/${fileName}`;
   const userId = await getCurrentUserId();
   const filePath = `${userId}/${Date.now()}-${fileName}`;
 
@@ -294,6 +350,7 @@ export async function getSignedUrlFor(
   path: string,
   expiresIn: number = 60 * 5,
 ): Promise<string> {
+  if (USE_MOCK) return "https://placehold.co/400x300.png";
   const { data, error } = await supabase.storage
     .from(bucket)
     .createSignedUrl(path, expiresIn);

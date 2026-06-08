@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
+import { bold, fs, s } from "@/utils/scale";
 
 export const styles = StyleSheet.create({
   screen: {
@@ -10,45 +11,47 @@ export const styles = StyleSheet.create({
   //dashboard styles
   container: {
     backgroundColor: "#850099",
-    borderRadius: 24,
-    padding: 10,
-    paddingBottom: 15,
-    paddingTop: 70,
-    minHeight: 200,
+    borderRadius: s(24),
+    padding: s(10),
+    paddingBottom: s(15),
+    paddingTop: s(70),
+    minHeight: s(200),
   },
   purplePanel: {
     backgroundColor: "#E6ADEF",
-    borderRadius: 24,
-    padding: 20,
-    paddingBottom: 35,
-    minHeight: 200,
+    borderRadius: s(24),
+    padding: s(20),
+    paddingBottom: s(35),
+    minHeight: s(200),
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingBottom: 15,
+    paddingBottom: s(15),
   },
   monthText: {
-    fontSize: 28,
-    fontFamily: "System",
-    fontWeight: "500",
+    fontSize: Platform.OS === "android" ? fs(20) : 28,
+    ...bold,
     color: "#B902D6",
   },
   addTaskText: {
-    fontSize: 16,
+    fontSize: Platform.OS === "android" ? fs(13) : 16,
     color: "#ffffff",
   },
   purpleButton: {
     backgroundColor: "#B902D6",
     borderRadius: 50,
-    padding: 15,
+    ...Platform.select({
+      android: { paddingVertical: s(8), paddingHorizontal: s(12) },
+      default: { padding: 15 },
+    }),
   },
   dateCarousel: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: s(10),
   },
   dateCarouselContainer: {
     alignSelf: "center",
@@ -57,47 +60,44 @@ export const styles = StyleSheet.create({
     backgroundColor: "#B902D6",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 60,
-    padding: 8,
-    width: 90,
-    height: 145,
+    borderRadius: s(60),
+    padding: s(8),
+    width: s(90),
+    height: s(145),
   },
   inactiveCard: {
     backgroundColor: "#FEE8FE",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 50,
-    padding: 10,
-    width: 50,
-    height: 150,
+    borderRadius: s(50),
+    padding: s(10),
+    width: s(50),
+    height: s(150),
   },
   dateNumberActive: {
-    fontSize: 50,
+    fontSize: fs(50),
     color: "#ffffff",
   },
   dateNumberInactive: {
-    fontSize: 20,
+    fontSize: fs(20),
     color: "#850099",
   },
   dayNameActive: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: fs(13),
+    ...bold,
     color: "#ffffff",
   },
   dayNameInactive: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: fs(14),
+    ...bold,
     color: "#850099",
   },
   monthContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: s(8),
   },
-  dropdownArrow: {
-    fontSize: 16,
-    color: "#B902D6",
-  },
+
   // iOS-only: white panel that slides up from the bottom to hold the spinner
   iosPickerContainer: {
     position: "absolute",
@@ -105,44 +105,150 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 10,
+    borderTopLeftRadius: s(20),
+    borderTopRightRadius: s(20),
+    paddingBottom: s(10),
     alignItems: "center",
   },
   // "Done" button inside the iOS picker panel
   doneButton: {
     alignSelf: "flex-end",
-    padding: 16,
+    padding: s(16),
     paddingBottom: 0,
   },
   doneButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: fs(16),
+    ...bold,
     color: "#B902D6",
   },
 
   fetchErrorBanner: {
     backgroundColor: "#FFF5F5",
-    borderRadius: 10,
+    borderRadius: s(10),
     borderLeftWidth: 4,
     borderLeftColor: "#D32F2F",
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    padding: s(12),
+    marginHorizontal: s(16),
+    marginBottom: s(8),
   },
   fetchErrorText: {
     color: "#D32F2F",
-    fontSize: 14,
+    fontSize: fs(14),
+  },
+
+  //************************* upcoming grouped view ***************************//
+  upcomingGroup: {
+    marginBottom: s(16),
+  },
+  upcomingDateHeader: {
+    fontSize: fs(13),
+    ...bold,
+    color: "#850099",
+    marginBottom: s(6),
+    marginTop: s(4),
+  },
+  upcomingSection: {
+    backgroundColor: "#fcf9fc",
+    borderRadius: s(12),
+    paddingHorizontal: s(12),
+    paddingVertical: s(8),
+    marginBottom: s(6),
+    boxShadow: "0 4px 16px 4px rgba(185,2,214,0.10)",
+  },
+  upcomingSectionLabel: {
+    fontSize: fs(10),
+    color: "#B902D6",
+    ...bold,
+    marginBottom: s(4),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  upcomingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: s(5),
+    borderTopWidth: 1,
+    borderTopColor: "#F3E6FF",
+  },
+  upcomingRowLeft: {
+    flex: 1,
+  },
+  upcomingRowName: {
+    fontSize: fs(13),
+    ...bold,
+    color: "#333",
+  },
+  upcomingRowSub: {
+    fontSize: fs(11),
+    color: "#999",
+  },
+  upcomingRowTime: {
+    fontSize: fs(12),
+    color: "#850099",
+    marginLeft: s(8),
+  },
+
+  //************************* appointment card styles *************************//
+  apptCard: {
+    flexDirection: "row",
+    backgroundColor: "#fcf9fc",
+    borderRadius: s(16),
+    padding: s(16),
+    marginBottom: s(12),
+    boxShadow: "0 0 10px 5px rgba(0, 0, 0, 0.05)",
+    borderLeftWidth: 4,
+    borderLeftColor: "#B902D6",
+  },
+  apptLeft: {
+    flex: 1,
+  },
+  apptRight: {
+    alignItems: "flex-end",
+    gap: s(4),
+  },
+  apptType: {
+    fontSize: fs(11),
+    color: "#939292",
+    marginBottom: s(4),
+  },
+  apptTitle: {
+    fontSize: fs(15),
+    ...bold,
+    color: "#850099",
+    marginBottom: s(2),
+  },
+  apptDetail: {
+    fontSize: fs(12),
+    color: "#555",
+  },
+  apptNotes: {
+    fontSize: fs(11),
+    color: "#999",
+    marginTop: s(4),
+    fontStyle: "italic",
+  },
+  apptDate: {
+    fontSize: fs(11),
+    color: "#850099",
+    backgroundColor: "#FEE8FE",
+    borderRadius: 50,
+    paddingHorizontal: s(8),
+    paddingVertical: s(3),
+    overflow: "hidden",
+  },
+  apptTime: {
+    fontSize: fs(11),
+    color: "#555",
   },
 
   //************************* record locker styles ****************************//
   topPanel: {
     backgroundColor: "#BE01DC",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    padding: 35,
-    paddingTop: (Constants.statusBarHeight ?? 0) + 35,
+    borderBottomLeftRadius: s(30),
+    borderBottomRightRadius: s(30),
+    padding: s(35),
+    paddingTop: (Constants.statusBarHeight ?? 0) + s(35),
   },
   //Panel for the Back Button and the Record Locker Title
   secondPanel: {
@@ -154,18 +260,18 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: "center",
-    fontSize: 24,
-    fontWeight: "600",
+    fontSize: fs(24),
+    ...bold,
     color: "#B902D6",
   },
   backButton: {
-    width: 50,
-    height: 50,
+    width: s(50),
+    height: s(50),
     borderRadius: 360,
     backgroundColor: "#F0EEFE",
     alignItems: "center",
     justifyContent: "center",
-    margin: 20,
+    margin: s(20),
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -173,7 +279,7 @@ export const styles = StyleSheet.create({
     elevation: 5,
   },
   backArrow: {
-    fontSize: 30,
+    fontSize: fs(30),
     color: "#B902D6",
   },
   // Search Input for the Record Locker
@@ -181,9 +287,9 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F5F5F5",
-    borderRadius: 24,
-    marginHorizontal: 20,
-    paddingHorizontal: 12,
+    borderRadius: s(24),
+    marginHorizontal: s(20),
+    paddingHorizontal: s(12),
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
@@ -191,12 +297,12 @@ export const styles = StyleSheet.create({
     elevation: 2,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: s(8),
     color: "#888",
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: s(10),
   },
   tabAndAddContainer: {
     flexDirection: "row",
@@ -210,9 +316,9 @@ export const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     borderRadius: 30,
-    width: 60,
-    height: 60,
-    marginRight: 20,
+    width: s(60),
+    height: s(60),
+    marginRight: s(20),
     alignItems: "center",
     justifyContent: "center",
   },

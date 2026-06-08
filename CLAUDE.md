@@ -29,7 +29,9 @@ app/
     _layout.tsx            # Stack (animation: slide_from_right)
     step1.tsx              # Full name input
     step2.tsx              # Date of birth picker
-    step3.tsx              # Health conditions
+    step3.tsx              # Health conditions + drug allergies (chip input)
+    step4.tsx              # Doctor info (name, clinic, contact)
+    step5.tsx              # Emergency contact (name, relationship, phone)
     done.tsx               # Completion + notification permission request
   (app)/
     _layout.tsx            # Stack with no header
@@ -63,7 +65,7 @@ app/
 
 **AI proxy:** `utils/ai.ts` exposes `analyzePrescription` and `analyzeAudio` — both call Supabase Edge Functions (`supabase/functions/analyze-prescription/` and `supabase/functions/analyze-audio/`). Edge Functions verify the user's auth server-side via `supabase.auth.getUser()` (ES256-safe), then call Gemini internally and return typed `MedicationItem[]`.
 
-**Database schema** defined in `supabase/migration.sql`. Tables: `profiles`, `prescriptions`, `medications`, `medication_schedules`, `medical_records`. All tables have RLS policies scoped to `auth.uid()`. Storage buckets: `prescriptions`, `medical-records`.
+**Database schema** defined in `supabase/migration.sql` (original) and `supabase/migration_v2.sql` (onboarding expansion). Tables: `profiles`, `prescriptions`, `medications`, `medication_schedules`, `medical_records`. All tables have RLS policies scoped to `auth.uid()`. Storage buckets: `prescriptions`, `medical-records`. New `profiles` columns added in v2: `drug_allergies`, `doctor_name`, `doctor_clinic`, `doctor_contact`, `emergency_name`, `emergency_relation`, `emergency_phone`.
 
 **Key data flow for saving prescriptions:**
 `MedicationCard list → "Add to Alalay" → uploadFile() to Supabase Storage → savePrescription() inserts prescription + medications rows → createSchedulesForMedication() for 7 days → scheduleNotificationFor() per future row`
