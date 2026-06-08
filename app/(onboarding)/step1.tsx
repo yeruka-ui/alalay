@@ -61,7 +61,7 @@ export default function OnboardingStep1() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.progressRow}>
-            {[0, 1, 2].map((i) => (
+            {[0, 1, 2, 3, 4].map((i) => (
               <View key={i} style={[styles.dot, i === 0 && styles.dotActive]} />
             ))}
           </View>

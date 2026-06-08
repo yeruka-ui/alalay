@@ -4,6 +4,16 @@ export type Profile = {
   full_name: string | null;
   birth_date: string | null;
   health_conditions: string[] | null;
+  // Step 3 additions
+  drug_allergies: string[] | null;
+  // Step 4 — doctor info
+  doctor_name: string | null;
+  doctor_clinic: string | null;
+  doctor_contact: string | null;
+  // Step 5 — emergency contact
+  emergency_name: string | null;
+  emergency_relation: string | null;
+  emergency_phone: string | null;
   onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
@@ -12,7 +22,17 @@ export type Profile = {
 export type ProfileUpdate = Partial<
   Pick<
     Profile,
-    "full_name" | "birth_date" | "health_conditions" | "onboarding_complete"
+    | "full_name"
+    | "birth_date"
+    | "health_conditions"
+    | "drug_allergies"
+    | "doctor_name"
+    | "doctor_clinic"
+    | "doctor_contact"
+    | "emergency_name"
+    | "emergency_relation"
+    | "emergency_phone"
+    | "onboarding_complete"
   >
 >;
 
@@ -61,6 +81,22 @@ export type MedicalRecord = {
   notes: string | null;
   created_at: string;
 };
+
+export type Appointment = {
+  id: number;
+  user_id: string;
+  title: string;
+  type: "doctor_visit" | "lab_test" | "follow_up" | "other";
+  doctor_name: string | null;
+  location: string | null;
+  notes: string | null;
+  appointment_date: string; // YYYY-MM-DD
+  appointment_time: string | null; // timetz
+  status: "upcoming" | "completed" | "cancelled";
+  created_at: string;
+};
+
+export type AppointmentInsert = Omit<Appointment, "id" | "created_at">;
 
 // Insert types (omit auto-generated fields)
 export type PrescriptionInsert = Omit<Prescription, "id" | "created_at">;

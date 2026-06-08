@@ -1,24 +1,33 @@
-import * as Notifications from "expo-notifications";
+// expo-notifications is lazy-loaded (via require inside each function) so that
+// importing this module doesn't crash Expo Go SDK 53+, which throws on any
+// push-token registration attempt. In mock mode these functions are never
+// called, so expo-notifications is never loaded.
+import type * as NotificationsType from "expo-notifications";
 import { Platform } from "react-native";
 import { combineManilaDateTime, manilaDateString } from "./manilaTime";
 import { supabase } from "./supabase";
 
 export const ANDROID_CHANNEL_ID = "medication-reminders";
 
-// Must be called once at module level (imported by root layout) so foreground
-// notifications display while the app is open.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+function N(): typeof NotificationsType {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("expo-notifications");
+}
 
 // ─── Setup ───────────────────────────────────────────────────
 
 export async function configureNotifications(): Promise<void> {
+  const Notifications = N();
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: "Medication reminders",
@@ -43,6 +52,7 @@ export async function configureNotifications(): Promise<void> {
 }
 
 export async function requestNotificationPermissions(): Promise<boolean> {
+  const Notifications = N();
   const existing = await Notifications.getPermissionsAsync();
   if (existing.granted) return true;
   const result = await Notifications.requestPermissionsAsync();
@@ -70,6 +80,7 @@ export async function scheduleNotificationFor(
   const fireAt = combineManilaDateTime(row.scheduled_date, row.scheduled_time);
   if (!fireAt || fireAt.getTime() <= Date.now() + 5_000) return null;
 
+  const Notifications = N();
   const body = [row.medication.dosage, row.medication.instructions]
     .filter(Boolean)
     .join(" • ");
@@ -102,7 +113,7 @@ export async function cancelNotificationFor(
   notificationId: string | null
 ): Promise<void> {
   if (notificationId) {
-    await Notifications.cancelScheduledNotificationAsync(notificationId).catch(
+    await N().cancelScheduledNotificationAsync(notificationId).catch(
       () => undefined // already fired or cancelled — not an error
     );
   }
@@ -119,6 +130,7 @@ export async function snoozeNotification(
   medicationName: string,
   snoozeMinutes = 10
 ): Promise<void> {
+  const Notifications = N();
   const fireAt = new Date(Date.now() + snoozeMinutes * 60_000);
 
   await Notifications.scheduleNotificationAsync({

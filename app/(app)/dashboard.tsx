@@ -2,7 +2,11 @@ import FloatingActionMenu from "@/components/floatingActionMenu";
 import MedicationCard from "@/components/MedicationCard";
 import TabFilterBar from "@/components/tabFilterBar";
 import { styles } from "@/styles/index.styles";
-import type { Medication, MedicationSchedule } from "@/types/database";
+import type {
+  Appointment,
+  Medication,
+  MedicationSchedule,
+} from "@/types/database";
 import {
   DAY_BATCH_SIZE,
   createDateBatch,
@@ -20,8 +24,16 @@ import {
   COLLAPSED_SELECTED_DAY_HEIGHT,
   getCalendarDayPresentation,
 } from "@/utils/dashboardCalendarPresentation";
-import { getActiveMedications, getSchedulesForDate, markScheduleStatus } from "@/utils/database";
+import {
+  getActiveMedications,
+  getAllPendingSchedules,
+  getAppointments,
+  getSchedulesForDate,
+  markScheduleStatus,
+} from "@/utils/database";
+import { fs, s } from "@/utils/scale";
 import { supabase } from "@/utils/supabase";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -46,7 +58,9 @@ import Animated, {
   useSharedValue,
   type SharedValue,
 } from "react-native-reanimated";
-import Carousel, { type ICarouselInstance } from "react-native-reanimated-carousel";
+import Carousel, {
+  type ICarouselInstance,
+} from "react-native-reanimated-carousel";
 
 const CALENDAR_PADDING = 60;
 const CALENDAR_GAP = 8;
@@ -59,11 +73,12 @@ const CALENDAR_EXPANDED_HEIGHT = 160;
 const CALENDAR_COLLAPSED_HEIGHT = COLLAPSED_SELECTED_DAY_HEIGHT + 16;
 const CALENDAR_COLLAPSE_SCROLL_DISTANCE =
   CALENDAR_EXPANDED_HEIGHT - CALENDAR_COLLAPSED_HEIGHT;
-const PURPLE_PANEL_EXPANDED_PADDING_BOTTOM = 35;
-const PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM = 18;
+const PURPLE_PANEL_EXPANDED_PADDING_BOTTOM = 16;
+const PURPLE_PANEL_COLLAPSED_PADDING_BOTTOM = 8;
 const DAY_LABEL_EXPANDED_MARGIN_TOP = 4;
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
 type CalendarDayCardProps = {
   date: Date;
@@ -214,9 +229,7 @@ function CalendarDayCard({
             {expandedPresentation.showDayLabel ? (
               <Text
                 style={[
-                  isSelected
-                    ? styles.dayNameActive
-                    : styles.dayNameInactive,
+                  isSelected ? styles.dayNameActive : styles.dayNameInactive,
                   { marginTop: DAY_LABEL_EXPANDED_MARGIN_TOP },
                 ]}
               >
@@ -307,9 +320,7 @@ function CalendarDayCard({
       >
         <Animated.Text
           style={[
-            isSelected
-              ? styles.dateNumberActive
-              : styles.dateNumberInactive,
+            isSelected ? styles.dateNumberActive : styles.dateNumberInactive,
             animatedNumberStyle,
           ]}
         >
@@ -317,9 +328,7 @@ function CalendarDayCard({
         </Animated.Text>
         <Animated.Text
           style={[
-            isSelected
-              ? styles.dayNameActive
-              : styles.dayNameInactive,
+            isSelected ? styles.dayNameActive : styles.dayNameInactive,
             {
               position: "absolute",
               bottom: isSelected ? 18 : 16,
@@ -339,8 +348,8 @@ export default function Dashboard() {
   // **************************** CALENDAR LOGIC ****************************
   const initialSelectedDate = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
-  const [batchAnchorStart, setBatchAnchorStart] = useState(() =>
-    getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
+  const [batchAnchorStart, setBatchAnchorStart] = useState(
+    () => getSelectedDateBatchState(initialSelectedDate).batchAnchorStart,
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
@@ -361,7 +370,11 @@ export default function Dashboard() {
     return scrollOffsetY.value / CALENDAR_COLLAPSE_SCROLL_DISTANCE;
   });
   const pageOffsets = useMemo(
-    () => Array.from({ length: PAGE_BUFFER * 2 + 1 }, (_, index) => index - PAGE_BUFFER),
+    () =>
+      Array.from(
+        { length: PAGE_BUFFER * 2 + 1 },
+        (_, index) => index - PAGE_BUFFER,
+      ),
     [],
   );
 
@@ -369,15 +382,22 @@ export default function Dashboard() {
   // Variable to track active and inactive tabs
   const [activeTab, setActiveTab] = useState("pending");
   const tabs = [
+    { id: "upcoming", label: "Upcoming", icon: "list" },
     { id: "pending", label: "Pending", icon: "bell" },
     { id: "medication", label: "Medication", icon: "plus-square" },
-    { id: "appointments", label: "Appointments", icon: "alert-circle" },
-    { id: "completed", label: "Completed", icon: "check" },
+    { id: "appointments", label: "Appts", icon: "calendar" },
+    { id: "completed", label: "Done", icon: "check" },
   ];
 
   // **************************** DATA FETCHING ****************************
-  const [schedules, setSchedules] = useState<(MedicationSchedule & { medication: Medication })[]>([]);
+  const [schedules, setSchedules] = useState<
+    (MedicationSchedule & { medication: Medication })[]
+  >([]);
+  const [upcomingSchedules, setUpcomingSchedules] = useState<
+    (MedicationSchedule & { medication: Medication })[]
+  >([]);
   const [allMedications, setAllMedications] = useState<Medication[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -408,20 +428,66 @@ export default function Dashboard() {
   }, [fetchSchedules]);
 
   useEffect(() => {
-    getActiveMedications().then(setAllMedications).catch(() => {});
+    getActiveMedications()
+      .then(setAllMedications)
+      .catch(() => {});
+    getAllPendingSchedules()
+      .then(setUpcomingSchedules)
+      .catch(() => {});
+    getAppointments()
+      .then(setAppointments)
+      .catch(() => {});
   }, []);
 
   const fetchDashboardData = fetchSchedules;
 
-  // Filter data based on active tab
-  const filteredSchedules = schedules.filter((s) => {
-    switch (activeTab) {
-      case "pending": return s.status === "pending";
-      case "medication": return true;
-      case "completed": return s.status === "taken";
-      default: return true;
+  type UpcomingGroup = {
+    date: string;
+    medications: (MedicationSchedule & { medication: Medication })[];
+    appointments: Appointment[];
+  };
+
+  const upcomingGroups: UpcomingGroup[] = useMemo(() => {
+    if (activeTab !== "upcoming") return [];
+    const map = new Map<string, UpcomingGroup>();
+    for (const s of upcomingSchedules) {
+      if (!map.has(s.scheduled_date))
+        map.set(s.scheduled_date, {
+          date: s.scheduled_date,
+          medications: [],
+          appointments: [],
+        });
+      map.get(s.scheduled_date)!.medications.push(s);
     }
-  });
+    for (const a of appointments) {
+      if (!map.has(a.appointment_date))
+        map.set(a.appointment_date, {
+          date: a.appointment_date,
+          medications: [],
+          appointments: [],
+        });
+      map.get(a.appointment_date)!.appointments.push(a);
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+  }, [activeTab, upcomingSchedules, appointments]);
+
+  const filteredSchedules =
+    activeTab === "upcoming"
+      ? []
+      : schedules.filter((s) => {
+          switch (activeTab) {
+            case "pending":
+              return s.status === "pending";
+            case "medication":
+              return true;
+            case "completed":
+              return s.status === "taken";
+            default:
+              return false;
+          }
+        });
 
   const getMonthName = (monthIndex: number): string => {
     const months = [
@@ -464,7 +530,10 @@ export default function Dashboard() {
     return `${hour12}:${m} ${ampm}`;
   };
 
-  const handleSelectedDateChange = (date: Date, transitionOffset: number = 0) => {
+  const handleSelectedDateChange = (
+    date: Date,
+    transitionOffset: number = 0,
+  ) => {
     const nextSelectionState = getSelectedDateBatchState(date);
 
     pendingTransitionOffsetRef.current = transitionOffset;
@@ -483,7 +552,8 @@ export default function Dashboard() {
     );
     const transitionOffset = getCalendarSelectionTransitionOffset({
       pressedIndex,
-      currentSelectedIndex: currentSelectedIndex >= 0 ? currentSelectedIndex : null,
+      currentSelectedIndex:
+        currentSelectedIndex >= 0 ? currentSelectedIndex : null,
       nextSelectedIndex: DAY_BATCH_CENTER_INDEX,
       activeCardWidth: selectedDayPresentation.width,
       inactiveCardWidth: inactiveDayPresentation.width,
@@ -498,7 +568,10 @@ export default function Dashboard() {
       return;
     }
 
-    carouselRef.current?.scrollTo({ index: CENTER_PAGE_INDEX, animated: false });
+    carouselRef.current?.scrollTo({
+      index: CENTER_PAGE_INDEX,
+      animated: false,
+    });
     calendarTranslateX.stopAnimation();
 
     const transitionOffset = pendingTransitionOffsetRef.current;
@@ -521,7 +594,7 @@ export default function Dashboard() {
   const calendarWidth = Math.max(screenWidth - CALENDAR_PADDING, 260);
   const inactiveCardWidth = Math.floor(
     (calendarWidth - CALENDAR_GAP * (DAY_BATCH_SIZE - 1) - ACTIVE_WIDTH_BONUS) /
-    DAY_BATCH_SIZE,
+      DAY_BATCH_SIZE,
   );
   const activeCardWidth = inactiveCardWidth + ACTIVE_WIDTH_BONUS;
   const selectedDayPresentation = getCalendarDayPresentation({
@@ -581,12 +654,7 @@ export default function Dashboard() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.screen}>
         <View style={[styles.container, { minHeight: 0 }]}>
-          <Animated.View
-            style={[
-              styles.purplePanel,
-              purplePanelAnimatedStyle,
-            ]}
-          >
+          <Animated.View style={[styles.purplePanel, purplePanelAnimatedStyle]}>
             <View style={styles.header}>
               <TouchableOpacity onPress={() => setIsDropdownOpen(true)}>
                 <View style={styles.monthContainer}>
@@ -594,7 +662,7 @@ export default function Dashboard() {
                     {getMonthName(selectedDate.getMonth())}{" "}
                     {selectedDate.getFullYear()}
                   </Text>
-                  <Text style={styles.dropdownArrow}>v</Text>
+                  <Ionicons name="chevron-down" size={fs(16)} color="#B902D6" />
                 </View>
               </TouchableOpacity>
 
@@ -603,9 +671,15 @@ export default function Dashboard() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => supabase.auth.signOut()}
-                style={{ marginLeft: 8, backgroundColor: "#850099", borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 }}
+                style={{
+                  marginLeft: s(8),
+                  backgroundColor: "#850099",
+                  borderRadius: s(8),
+                  paddingVertical: s(6),
+                  paddingHorizontal: s(10),
+                }}
               >
-                <Text style={{ color: "#FFF", fontSize: 12 }}>Logout</Text>
+                <Text style={{ color: "#FFF", fontSize: fs(12) }}>Logout</Text>
               </TouchableOpacity>
             </View>
 
@@ -623,7 +697,9 @@ export default function Dashboard() {
                   width={calendarWidth}
                   windowSize={5}
                   renderItem={({ item }) => {
-                    const pageDates = createDateBatch(getBatchStartForOffset(batchAnchorStart, item));
+                    const pageDates = createDateBatch(
+                      getBatchStartForOffset(batchAnchorStart, item),
+                    );
 
                     return (
                       <RNAnimated.View
@@ -631,7 +707,12 @@ export default function Dashboard() {
                           transform: [{ translateX: calendarTranslateX }],
                         }}
                       >
-                        <View style={[styles.dateCarousel, { width: calendarWidth, gap: CALENDAR_GAP }]}>
+                        <View
+                          style={[
+                            styles.dateCarousel,
+                            { width: calendarWidth, gap: CALENDAR_GAP },
+                          ]}
+                        >
                           {pageDates.map((date, index) => {
                             const isSelected = isSameDay(date, selectedDate);
 
@@ -639,13 +720,18 @@ export default function Dashboard() {
                               <CalendarDayCard
                                 key={date.toISOString()}
                                 date={date}
-                                dayLabel={getDayName(date.getDay(), !isSelected)}
+                                dayLabel={getDayName(
+                                  date.getDay(),
+                                  !isSelected,
+                                )}
                                 isSelected={isSelected}
                                 collapseProgress={calendarCollapseProgress}
                                 activeCardWidth={activeCardWidth}
                                 inactiveCardWidth={inactiveCardWidth}
                                 animationMode={calendarDayAnimationMode}
-                                onPress={() => handleDayPress(date, index, pageDates)}
+                                onPress={() =>
+                                  handleDayPress(date, index, pageDates)
+                                }
                               />
                             );
                           })}
@@ -658,73 +744,253 @@ export default function Dashboard() {
             </Animated.View>
           </Animated.View>
         </View>
-        <TabFilterBar
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+        <View style={{ flex: 1, padding: s(9) }}>
+          <TabFilterBar
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
 
-        {/* Error banner */}
-        {!!fetchError && (
-          <View style={styles.fetchErrorBanner}>
-            <Text style={styles.fetchErrorText}>{fetchError}</Text>
-          </View>
-        )}
+          {/* Error banner */}
+          {!!fetchError && (
+            <View style={styles.fetchErrorBanner}>
+              <Text style={styles.fetchErrorText}>{fetchError}</Text>
+            </View>
+          )}
 
-        {/* Medication Schedule List */}
-        {isLoadingData ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#B902D6" />
-          </View>
-        ) : filteredSchedules.length > 0 ? (
-          <Animated.ScrollView
-            style={{ flex: 1, paddingHorizontal: 16 }}
-            onScroll={handleContentScroll}
-            scrollEventThrottle={16}
-          >
-            {filteredSchedules.map((schedule) => (
-              <MedicationCard
-                key={schedule.id}
-                item={{
-                  id: String(schedule.id),
-                  name: schedule.medication?.name ?? "",
-                  instructions: schedule.medication?.instructions ?? "",
-                  dosage: schedule.medication?.dosage ?? undefined,
-                  time: formatTime(schedule.scheduled_time),
-                }}
-                status={schedule.status as "pending" | "taken"}
-                onTake={async () => {
-                  await markScheduleStatus(schedule.id, "taken", schedule.notification_id);
-                  fetchDashboardData();
-                }}
-              />
-            ))}
-          </Animated.ScrollView>
-        ) : activeTab === "medication" && allMedications.length > 0 ? (
-          <Animated.ScrollView
-            style={{ flex: 1, paddingHorizontal: 16 }}
-            onScroll={handleContentScroll}
-            scrollEventThrottle={16}
-          >
-            {allMedications.map((med) => (
-              <MedicationCard
-                key={med.id}
-                item={{
-                  id: String(med.id),
-                  name: med.name,
-                  instructions: med.instructions ?? "",
-                  dosage: med.dosage ?? undefined,
-                  time: "",
-                }}
-              />
-            ))}
-          </Animated.ScrollView>
-        ) : (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ color: "#999", fontSize: 15 }}>No items for this date</Text>
-          </View>
-        ) : null}
+          {/* Content */}
+          {isLoadingData ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <ActivityIndicator size="large" color="#B902D6" />
+            </View>
+          ) : activeTab === "upcoming" ? (
+            upcomingGroups.length > 0 ? (
+              <Animated.ScrollView
+                style={{ flex: 1, paddingHorizontal: s(16) }}
+                onScroll={handleContentScroll}
+                scrollEventThrottle={16}
+              >
+                {upcomingGroups.map((group) => (
+                  <View key={group.date} style={styles.upcomingGroup}>
+                    <Text style={styles.upcomingDateHeader}>
+                      {(() => {
+                        const [y, m, d] = group.date.split("-").map(Number);
+                        const dt = new Date(y, m - 1, d);
+                        return dt.toLocaleDateString("en-PH", {
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                        });
+                      })()}
+                    </Text>
 
+                    {group.medications.length > 0 && (
+                      <View style={styles.upcomingSection}>
+                        <Text style={styles.upcomingSectionLabel}>
+                          Medications
+                        </Text>
+                        {group.medications.map((s, i) => (
+                          <View
+                            key={s.id}
+                            style={[
+                              styles.upcomingRow,
+                              i === 0 && { borderTopWidth: 0 },
+                            ]}
+                          >
+                            <View style={styles.upcomingRowLeft}>
+                              <Text style={styles.upcomingRowName}>
+                                {s.medication?.name}
+                              </Text>
+                              {s.medication?.dosage && (
+                                <Text style={styles.upcomingRowSub}>
+                                  {s.medication.dosage}
+                                </Text>
+                              )}
+                            </View>
+                            <Text style={styles.upcomingRowTime}>
+                              {formatTime(s.scheduled_time)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {group.appointments.length > 0 && (
+                      <View style={styles.upcomingSection}>
+                        <Text style={styles.upcomingSectionLabel}>
+                          Appointments
+                        </Text>
+                        {group.appointments.map((a, i) => (
+                          <View
+                            key={a.id}
+                            style={[
+                              styles.upcomingRow,
+                              i === 0 && { borderTopWidth: 0 },
+                            ]}
+                          >
+                            <View style={styles.upcomingRowLeft}>
+                              <Text style={styles.upcomingRowName}>
+                                {a.title}
+                              </Text>
+                              {a.doctor_name && (
+                                <Text style={styles.upcomingRowSub}>
+                                  {a.doctor_name}
+                                </Text>
+                              )}
+                            </View>
+                            <Text style={styles.upcomingRowTime}>
+                              {a.appointment_time
+                                ? formatTime(a.appointment_time)
+                                : "—"}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </Animated.ScrollView>
+            ) : (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#999", fontSize: fs(14) }}>
+                  Nothing upcoming
+                </Text>
+              </View>
+            )
+          ) : activeTab === "appointments" ? (
+            appointments.length > 0 ? (
+              <Animated.ScrollView
+                style={{ flex: 1, paddingHorizontal: s(16) }}
+                onScroll={handleContentScroll}
+                scrollEventThrottle={16}
+              >
+                {appointments.map((appt) => (
+                  <View key={appt.id} style={styles.apptCard}>
+                    <View style={styles.apptLeft}>
+                      <Text style={styles.apptType}>
+                        {appt.type === "doctor_visit"
+                          ? "Doctor Visit"
+                          : appt.type === "lab_test"
+                            ? "Lab Test"
+                            : appt.type === "follow_up"
+                              ? "Follow-up"
+                              : "Appointment"}
+                      </Text>
+                      <Text style={styles.apptTitle}>{appt.title}</Text>
+                      {appt.doctor_name && (
+                        <Text style={styles.apptDetail}>
+                          {appt.doctor_name}
+                        </Text>
+                      )}
+                      {appt.location && (
+                        <Text style={styles.apptDetail}>{appt.location}</Text>
+                      )}
+                      {appt.notes && (
+                        <Text style={styles.apptNotes}>{appt.notes}</Text>
+                      )}
+                    </View>
+                    <View style={styles.apptRight}>
+                      <Text style={styles.apptDate}>
+                        {appt.appointment_date}
+                      </Text>
+                      {appt.appointment_time && (
+                        <Text style={styles.apptTime}>
+                          {formatTime(appt.appointment_time)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </Animated.ScrollView>
+            ) : (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#999", fontSize: fs(14) }}>
+                  No upcoming appointments
+                </Text>
+              </View>
+            )
+          ) : filteredSchedules.length > 0 ? (
+            <Animated.ScrollView
+              style={{ flex: 1, paddingHorizontal: s(16) }}
+              onScroll={handleContentScroll}
+              scrollEventThrottle={16}
+            >
+              {filteredSchedules.map((schedule) => (
+                <MedicationCard
+                  key={schedule.id}
+                  item={{
+                    id: String(schedule.id),
+                    name: schedule.medication?.name ?? "",
+                    instructions: schedule.medication?.instructions ?? "",
+                    dosage: schedule.medication?.dosage ?? undefined,
+                    time: formatTime(schedule.scheduled_time),
+                  }}
+                  status={schedule.status as "pending" | "taken"}
+                  onTake={async () => {
+                    await markScheduleStatus(
+                      schedule.id,
+                      "taken",
+                      schedule.notification_id,
+                    );
+                    fetchDashboardData();
+                    getAllPendingSchedules()
+                      .then(setUpcomingSchedules)
+                      .catch(() => {});
+                  }}
+                />
+              ))}
+            </Animated.ScrollView>
+          ) : activeTab === "medication" && allMedications.length > 0 ? (
+            <Animated.ScrollView
+              style={{ flex: 1, paddingHorizontal: s(16) }}
+              onScroll={handleContentScroll}
+              scrollEventThrottle={16}
+            >
+              {allMedications.map((med) => (
+                <MedicationCard
+                  key={med.id}
+                  item={{
+                    id: String(med.id),
+                    name: med.name,
+                    instructions: med.instructions ?? "",
+                    dosage: med.dosage ?? undefined,
+                    time: "",
+                  }}
+                />
+              ))}
+            </Animated.ScrollView>
+          ) : (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#999", fontSize: fs(14) }}>
+                No items for this date
+              </Text>
+            </View>
+          )}
+        </View>
         {/* Floating Action Menu */}
         <FloatingActionMenu />
       </View>
@@ -764,7 +1030,8 @@ export default function Dashboard() {
           display="default"
           onChange={(event: DateTimePickerEvent, date?: Date) => {
             setIsDropdownOpen(false);
-            if (event.type !== "dismissed" && date) handleSelectedDateChange(date);
+            if (event.type !== "dismissed" && date)
+              handleSelectedDateChange(date);
           }}
         />
       )}
